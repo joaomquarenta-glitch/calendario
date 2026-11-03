@@ -1,6 +1,8 @@
 package com.quarenta.calendario
 
 import android.Manifest
+import com.quarenta.calendario.ui.theme.ThemeState
+import com.quarenta.calendario.ui.theme.Themes
 import android.app.Application
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -46,6 +48,7 @@ sealed interface Overlay {
     /** [editingId] is null for a new event. */
     data class Editor(val draft: EventDraft, val editingId: Long? = null, val fromOtherApp: Boolean = false) : Overlay
     data class PersonCard(val person: Person) : Overlay
+    data object Appearance : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -182,6 +185,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openPerson(person: Person) = push(Overlay.PersonCard(person))
+
+    fun openAppearance() = push(Overlay.Appearance)
+
+    private val prefs = app.getSharedPreferences("forty", android.content.Context.MODE_PRIVATE)
+
+    init {
+        ThemeState.selectedId = prefs.getString("theme", Themes.SYSTEM) ?: Themes.SYSTEM
+    }
+
+    /** Applies a look at once and remembers it for next time. */
+    fun setTheme(id: String) {
+        ThemeState.selectedId = id
+        prefs.edit().putString("theme", id).apply()
+    }
 
     fun say(text: String) { _message.value = text }
 

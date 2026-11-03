@@ -70,6 +70,12 @@ import com.quarenta.calendario.ui.event.EventEditorScreen
 import com.quarenta.calendario.ui.home.HomeScreen
 import com.quarenta.calendario.ui.tasks.TasksScreen
 import com.quarenta.calendario.ui.theme.Bento
+import com.quarenta.calendario.ui.theme.AppearanceScreen
+import com.quarenta.calendario.ui.theme.ThemeState
+import com.quarenta.calendario.ui.theme.Themes
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 import com.quarenta.calendario.ui.theme.CalendarioTheme
 
 private enum class Tab(val label: String, val icon: ImageVector) {
@@ -84,6 +90,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Apply the saved colours before the first frame, so the app never flashes white.
+        ThemeState.selectedId = getSharedPreferences("forty", MODE_PRIVATE).getString("theme", Themes.SYSTEM) ?: Themes.SYSTEM
+        ThemeState.systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
         enableEdgeToEdge()
         // Only handle the launching intent once, not again after a rotation.
         if (savedInstanceState == null) vm.handleIntent(intent)
@@ -143,6 +153,17 @@ private fun App(vm: AppViewModel) {
         else { afterWriteGranted = action; writeContacts.launch(Manifest.permission.WRITE_CONTACTS) }
     }
 
+    // Dark status-bar icons on light looks, light icons on the black look.
+    val view = LocalView.current
+    val darkLook = ThemeState.isDark
+    SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = !darkLook
+            isAppearanceLightNavigationBars = !darkLook
+        }
+    }
+
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -155,7 +176,7 @@ private fun App(vm: AppViewModel) {
             containerColor = Bento.Ground,
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Color.White) {
+                NavigationBar(containerColor = Bento.Tile) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -199,6 +220,7 @@ private fun App(vm: AppViewModel) {
                         onOpenEvent = vm::openEvent,
                         people = people,
                         onOpenPerson = vm::openPerson,
+                        onOpenAppearance = vm::openAppearance,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -249,6 +271,11 @@ private fun App(vm: AppViewModel) {
                 onCancel = vm::closeOverlay,
                 onSave = { draft -> vm.save(draft, o.editingId) },
             )
+            Overlay.Appearance -> AppearanceScreen(
+                selectedId = ThemeState.selectedId,
+                onSelect = vm::setTheme,
+                onClose = vm::closeOverlay,
+            )
             is Overlay.PersonCard -> {
                 val key = o.person.lookupKey
                 val noteFlow = remember(key) { vm.noteFor(key) }
@@ -279,7 +306,7 @@ private fun UpdateBanner(update: AppUpdate, progress: Float?, onUpdate: () -> Un
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(Color.White)
+            .background(Bento.Tile)
             .padding(14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
