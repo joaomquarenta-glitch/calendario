@@ -29,10 +29,20 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           FORTY_KEYSTORE_PASSWORD: ${{ secrets.FORTY_KEYSTORE_PASSWORD }}
+          FORTY_KEYSTORE_B64: ${{ secrets.FORTY_KEYSTORE_B64 }}
         run: |
-          if [ -z "$FORTY_KEYSTORE_PASSWORD" ]; then
-            echo "::error::Missing secret FORTY_KEYSTORE_PASSWORD: without it the phone would refuse the update."
+          if [ -z "$FORTY_KEYSTORE_PASSWORD" ] || [ -z "$FORTY_KEYSTORE_B64" ]; then
+            echo "::error::Missing secrets FORTY_KEYSTORE_B64 / FORTY_KEYSTORE_PASSWORD: without them the phone would refuse the update."
             exit 1
+          fi
+
+      - name: Restore the signing key from the secret
+        env:
+          FORTY_KEYSTORE_B64: ${{ secrets.FORTY_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$FORTY_KEYSTORE_B64" ]; then
+            mkdir -p keystore
+            echo "$FORTY_KEYSTORE_B64" | base64 --decode > keystore/fortycalendar.p12
           fi
 
       - name: Build debug APK
