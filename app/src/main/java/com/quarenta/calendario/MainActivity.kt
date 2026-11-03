@@ -18,7 +18,30 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.CheckBox
 import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.quarenta.calendario.data.AppUpdate
+import com.quarenta.calendario.ui.components.IconTile
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -77,9 +100,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.refresh()
         vm.refreshPeople()
+        vm.checkForUpdate()
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun App(vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
@@ -92,6 +117,10 @@ private fun App(vm: AppViewModel) {
     val overlay by vm.overlay.collectAsStateWithLifecycle()
     val writable by vm.writableCalendars.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val update by vm.update.collectAsStateWithLifecycle()
+    val updateProgress by vm.updateProgress.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val pullState = rememberPullToRefreshState()
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         vm.onPermissionResult()
@@ -132,7 +161,21 @@ private fun App(vm: AppViewModel) {
                 }
             },
         ) { padding ->
-            Box(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+            Column(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+              update?.let { UpdateBanner(it, updateProgress, onUpdate = vm::startUpdate) }
+              PullToRefreshBox(
+                isRefreshing = refreshing,
+                onRefresh = vm::pullToRefresh,
+                state = pullState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        state = pullState,
+                        isRefreshing = refreshing,
+                        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding(),
+                    )
+                },
+              ) {
                 when (tab) {
                     Tab.Home -> HomeScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -164,6 +207,7 @@ private fun App(vm: AppViewModel) {
                         onDelete = vm::deleteTask,
                     )
                 }
+              }
             }
         }
 
@@ -207,5 +251,46 @@ private fun App(vm: AppViewModel) {
                 )
             }
         } }
+    }
+}
+
+/** Shown above the tab bar when GitHub has a newer version. */
+@Composable
+private fun UpdateBanner(update: AppUpdate, progress: Float?, onUpdate: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color.White)
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(Icons.Rounded.SystemUpdate, Bento.Blue, 40.dp, 22.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Nova versão disponível", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Bento.Ink)
+                Text(
+                    if (progress == null) "Versão ${update.version}. Não perdes nada." else "A descarregar… ${(progress * 100).toInt()}%",
+                    fontSize = 13.sp, color = Bento.Secondary,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Button(
+                onClick = onUpdate,
+                enabled = progress == null,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Bento.Blue),
+            ) { Text("Atualizar", fontWeight = FontWeight.Bold) }
+        }
+        if (progress != null) {
+            Spacer(Modifier.height(10.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                color = Bento.Blue,
+                trackColor = Bento.Blue.copy(alpha = 0.15f),
+            )
+        }
     }
 }
