@@ -10,7 +10,7 @@ val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
 // All versions are signed with the same key: without this Android refuses the update
 // and asks to uninstall first. The key file and its password are GitHub secrets (never in the repo);
 // CI writes the file to keystore/fortycalendar.p12 before building.
-val keystoreFile = keystoreFile
+val keystoreFile: File = rootProject.file("keystore/fortycalendar.p12")
 val keystorePassword: String? = System.getenv("FORTY_KEYSTORE_PASSWORD")
     ?.takeIf { it.isNotBlank() && keystoreFile.exists() }
 
