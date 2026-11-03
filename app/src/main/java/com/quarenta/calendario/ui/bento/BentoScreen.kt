@@ -62,10 +62,7 @@ private val avatarColors = listOf(Bento.Orange, Bento.Purple, Bento.Teal, Bento.
 
 fun avatarColor(name: String): Color = avatarColors[(name.hashCode() and 0x7fffffff) % avatarColors.size]
 
-fun initials(name: String): String =
-    name.split(' ').filter { it.isNotBlank() }.let { parts ->
-        (parts.firstOrNull()?.take(1).orEmpty() + (if (parts.size > 1) parts.last().take(1) else "")).uppercase()
-    }
+fun initials(name: String): String = com.quarenta.calendario.data.ContactFormat.initials(name)
 
 /** Loads a contact photo off the main thread, in full size when [full] is true. */
 @Composable

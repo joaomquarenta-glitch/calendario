@@ -183,6 +183,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openPerson(person: Person) = push(Overlay.PersonCard(person))
 
+    fun say(text: String) { _message.value = text }
+
     fun canWriteContacts(): Boolean =
         ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.WRITE_CONTACTS) ==
             PackageManager.PERMISSION_GRANTED
