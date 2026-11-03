@@ -183,6 +183,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openPerson(person: Person) = push(Overlay.PersonCard(person))
 
+    fun canWriteContacts(): Boolean =
+        ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.WRITE_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
+
+    /** Star or unstar a person. The open card updates at once; the list reloads from the phone. */
+    fun toggleFavourite(person: Person) {
+        if (!canWriteContacts()) {
+            _message.value = "Sem autorização para alterar os favoritos"
+            return
+        }
+        val wanted = !person.starred
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { contacts.setStarred(person, wanted) }.getOrDefault(false) }
+            if (!ok) {
+                _message.value = "Não foi possível alterar os favoritos"
+                return@launch
+            }
+            val updated = person.copy(starred = wanted)
+            for (i in stack.indices) {
+                val o = stack[i]
+                if (o is Overlay.PersonCard && o.person.id == person.id) stack[i] = Overlay.PersonCard(updated)
+            }
+            _overlay.value = stack.lastOrNull()
+            _people.value = _people.value.map { if (it.id == person.id) updated else it }
+            _message.value = if (wanted) "${person.name} está nos favoritos" else "${person.name} saiu dos favoritos"
+            refreshPeople()
+        }
+    }
+
     fun noteFor(key: String): Flow<PersonNote?> = personDao.observeNote(key)
     fun fieldsFor(key: String): Flow<List<PersonField>> = personDao.observeFields(key)
 

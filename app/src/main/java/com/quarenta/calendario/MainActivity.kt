@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.quarenta.calendario.data.Person
 import com.quarenta.calendario.data.AppUpdate
 import com.quarenta.calendario.ui.components.IconTile
 import androidx.compose.material3.NavigationBar
@@ -130,6 +131,18 @@ private fun App(vm: AppViewModel) {
     }
     val requestContacts = { permission.launch(arrayOf(Manifest.permission.READ_CONTACTS)) }
 
+    // Starring writes to the phone's contacts, so Android asks once for permission to change them.
+    var starPending by remember { mutableStateOf<Person?>(null) }
+    val writeContacts = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        // If refused, toggleFavourite explains that nothing changed.
+        starPending?.let(vm::toggleFavourite)
+        starPending = null
+    }
+    val toggleFavourite: (Person) -> Unit = { p ->
+        if (vm.canWriteContacts()) vm.toggleFavourite(p)
+        else { starPending = p; writeContacts.launch(Manifest.permission.WRITE_CONTACTS) }
+    }
+
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(message) {
         val text = message ?: return@LaunchedEffect
@@ -184,6 +197,8 @@ private fun App(vm: AppViewModel) {
                         onOpenTasks = { tab = Tab.Tasks },
                         onOpenBento = { tab = Tab.People },
                         onOpenEvent = vm::openEvent,
+                        people = people,
+                        onOpenPerson = vm::openPerson,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -247,6 +262,7 @@ private fun App(vm: AppViewModel) {
                     onAddField = { label, value -> vm.addField(key, label, value) },
                     onDeleteField = vm::deleteField,
                     onOpenEvent = vm::openEvent,
+                    onToggleFavourite = { toggleFavourite(o.person) },
                     onClose = vm::closeOverlay,
                 )
             }

@@ -164,6 +164,13 @@ fun BentoScreen(
             item(span = { GridItemSpan(maxLineSpan) }) { Label("FAVORITOS") }
             items(favourites, key = { "f${it.id}" }) { person -> PhotoTile(person) { onOpenPerson(person) } }
             item(span = { GridItemSpan(maxLineSpan) }) { Label("TODOS") }
+        } else if (q.isBlank() && filtered.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    "Para pôr alguém nos favoritos, abre a ficha e toca na estrela, em cima à direita.",
+                    color = Bento.Secondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                )
+            }
         }
         items(filtered, key = { it.id }) { person -> PersonTile(person) { onOpenPerson(person) } }
         if (filtered.isEmpty()) {

@@ -20,9 +20,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -35,8 +35,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quarenta.calendario.data.CalendarEvent
+import com.quarenta.calendario.data.Person
 import com.quarenta.calendario.data.Task
 import com.quarenta.calendario.ui.AccessCard
+import com.quarenta.calendario.ui.bento.Avatar
 import com.quarenta.calendario.ui.components.BentoTile
 import com.quarenta.calendario.ui.components.IconTile
 import com.quarenta.calendario.ui.components.ProgressBar
@@ -61,6 +63,8 @@ fun HomeScreen(
     onOpenTasks: () -> Unit,
     onOpenBento: () -> Unit,
     onOpenEvent: (CalendarEvent) -> Unit = {},
+    people: List<Person> = emptyList(),
+    onOpenPerson: (Person) -> Unit = {},
 ) {
     val today = LocalDate.now()
     val now = Instant.now()
@@ -160,11 +164,34 @@ fun HomeScreen(
                 Text("Pessoas", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 Text("Fichas ao estilo Bento", fontSize = 12.sp, color = Bento.Secondary)
             }
-            BentoTile(Modifier.weight(1f).height(140.dp), onClick = onOpenBento) {
-                IconTile(Icons.Rounded.Folder, Bento.Purple)
+            val favourites = people.filter { it.starred }
+            // One favourite opens straight to their card; several open the Pessoas tab, where they sit on top.
+            BentoTile(
+                Modifier.weight(1f).height(140.dp),
+                onClick = { favourites.singleOrNull()?.let(onOpenPerson) ?: onOpenBento() },
+            ) {
+                if (favourites.isEmpty()) {
+                    IconTile(Icons.Rounded.Star, Bento.Yellow)
+                } else {
+                    Box(Modifier.height(44.dp)) {
+                        favourites.take(3).forEachIndexed { i, p ->
+                            Box(
+                                Modifier.padding(start = (i * 26).dp).size(44.dp).clip(CircleShape)
+                                    .background(Color.White).padding(2.dp),
+                            ) { Avatar(p, 40.dp) }
+                        }
+                    }
+                }
                 Spacer(Modifier.weight(1f))
-                Text("Projetos", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("Em breve", fontSize = 12.sp, color = Bento.Secondary)
+                Text("Favoritos", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    when (favourites.size) {
+                        0 -> "Toca na estrela numa ficha"
+                        1 -> favourites.first().name
+                        else -> "${favourites.size} pessoas"
+                    },
+                    fontSize = 12.sp, color = Bento.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
             }
         }
 
