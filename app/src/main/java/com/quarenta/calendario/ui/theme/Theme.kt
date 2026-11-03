@@ -28,6 +28,7 @@ object Bento {
     val Purple = Color(0xFFAF52DE)
     val Indigo = Color(0xFF5856D6)
     val Teal = Color(0xFF30B0C7)
+    val Yellow = Color(0xFFFFCC00)
 
     /** Darker shades that keep 4.5:1 contrast for small text on white. */
     val BlueText = Color(0xFF0062CC)

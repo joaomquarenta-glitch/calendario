@@ -73,6 +73,15 @@ class ContactsRepository(private val context: Context) {
         return out
     }
 
+    /** Adds or removes the star in the phone's contacts, so Google/Samsung Contacts show the same favourites. */
+    fun setStarred(person: Person, starred: Boolean): Boolean {
+        val values = android.content.ContentValues().apply {
+            put(ContactsContract.Contacts.STARRED, if (starred) 1 else 0)
+        }
+        val uri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id)
+        return resolver.update(uri, values, null, null) > 0
+    }
+
     fun details(person: Person): PersonDetails {
         val phones = mutableListOf<LabeledValue>()
         val emails = mutableListOf<LabeledValue>()

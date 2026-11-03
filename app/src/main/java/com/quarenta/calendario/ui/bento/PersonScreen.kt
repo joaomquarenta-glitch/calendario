@@ -34,6 +34,8 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -113,6 +115,7 @@ fun PersonScreen(
     onAddField: (String, String) -> Unit,
     onDeleteField: (Long) -> Unit,
     onOpenEvent: (CalendarEvent) -> Unit,
+    onToggleFavourite: () -> Unit,
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
@@ -158,12 +161,26 @@ fun PersonScreen(
                 Modifier.fillMaxWidth().height(180.dp).align(Alignment.BottomCenter)
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)))),
             )
-            Row(Modifier.statusBarsPadding().padding(8.dp)) {
+            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp)) {
                 IconButton(
                     onClick = onClose,
                     modifier = Modifier.size(44.dp).clip(CircleShape),
                     colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.35f), contentColor = Color.White),
                 ) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar") }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = onToggleFavourite,
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.35f),
+                        contentColor = if (person.starred) Bento.Yellow else Color.White,
+                    ),
+                ) {
+                    Icon(
+                        if (person.starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                        contentDescription = if (person.starred) "Tirar dos favoritos" else "Pôr nos favoritos",
+                    )
+                }
             }
             Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
                 Text(person.name, color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 40.sp)
