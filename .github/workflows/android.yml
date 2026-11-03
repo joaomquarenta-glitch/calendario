@@ -29,19 +29,19 @@ jobs:
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Name the APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk CalendarioBento.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk FortyCalendar.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: CalendarioBento-apk
-          path: CalendarioBento.apk
+          name: FortyCalendar-apk
+          path: FortyCalendar.apk
 
       - name: Publish release with the APK (main only)
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.2.${{ github.run_number }}
-          name: Calendário Bento 0.2.${{ github.run_number }}
-          body: Descarrega o ficheiro CalendarioBento.apk abaixo e abre-o no telemóvel para instalar.
-          files: CalendarioBento.apk
+          name: FortyCalendar 0.2.${{ github.run_number }}
+          body: Descarrega o ficheiro FortyCalendar.apk abaixo e abre-o no telemóvel para instalar.
+          files: FortyCalendar.apk
           make_latest: true
