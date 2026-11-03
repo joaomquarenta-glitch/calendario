@@ -1,10 +1,10 @@
-# Calendário Bento
+# FortyCalendar
 
 App Android que junta calendário, agenda, tarefas e fichas de pessoas ao estilo do Bento, com visual inspirado na Apple.
 
 ## Instalar no telemóvel
 
-Cada versão aprovada fica em **Releases** (coluna da direita no GitHub). Abre a última, descarrega `CalendarioBento.apk` no telemóvel e abre o ficheiro. Na primeira vez o Android pede para permitir "instalar apps desta fonte".
+Cada versão aprovada fica em **Releases** (coluna da direita no GitHub). Abre a última, descarrega `FortyCalendar.apk` no telemóvel e abre o ficheiro. Na primeira vez o Android pede para permitir "instalar apps desta fonte".
 
 ## Compilar
 
