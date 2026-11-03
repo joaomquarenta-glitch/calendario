@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 108dp canvas, art kept inside the 66dp safe zone: four rounded "bento" tiles -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M36,34h14a4,4 0,0 1,4 4v14a4,4 0,0 1,-4 4h-14a4,4 0,0 1,-4 -4v-14a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#FFFFD60A"
+        android:pathData="M60,34h12a4,4 0,0 1,4 4v14a4,4 0,0 1,-4 4h-12a4,4 0,0 1,-4 -4v-14a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#FF34C759"
+        android:pathData="M36,58h12a4,4 0,0 1,4 4v8a4,4 0,0 1,-4 4h-12a4,4 0,0 1,-4 -4v-8a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#FFFF9500"
+        android:pathData="M58,58h14a4,4 0,0 1,4 4v8a4,4 0,0 1,-4 4h-14a4,4 0,0 1,-4 -4v-8a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#FF007AFF"
+        android:pathData="M38,42h10v2h-10zM38,47h7v2h-7z" />
+</vector>
