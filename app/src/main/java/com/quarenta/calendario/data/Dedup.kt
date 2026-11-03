@@ -16,7 +16,7 @@ object Dedup {
 
     private val noiseWords = setOf(
         "aniversario", "aniversário", "anos", "birthday", "bday", "parabens", "parabéns",
-        "de", "do", "da", "dos", "das", "com", "o", "a", "e",
+        "de", "do", "da", "dos", "das", "no", "na", "nos", "nas", "em", "com", "o", "a", "e",
     )
 
     fun normalize(title: String): String {
