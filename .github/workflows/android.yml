@@ -25,7 +25,19 @@ jobs:
       - name: Run tests
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      - name: Check the signing key password is set (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          FORTY_KEYSTORE_PASSWORD: ${{ secrets.FORTY_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$FORTY_KEYSTORE_PASSWORD" ]; then
+            echo "::error::Missing secret FORTY_KEYSTORE_PASSWORD: without it the phone would refuse the update."
+            exit 1
+          fi
+
       - name: Build debug APK
+        env:
+          FORTY_KEYSTORE_PASSWORD: ${{ secrets.FORTY_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Name the APK
@@ -40,8 +52,8 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.${{ github.run_number }}
-          name: FortyCalendar 0.2.${{ github.run_number }}
+          tag_name: v0.3.${{ github.run_number }}
+          name: FortyCalendar 0.3.${{ github.run_number }}
           body: Descarrega o ficheiro FortyCalendar.apk abaixo e abre-o no telemóvel para instalar.
           files: FortyCalendar.apk
           make_latest: true

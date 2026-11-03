@@ -24,6 +24,9 @@ import com.quarenta.calendario.data.EventDraft
 import com.quarenta.calendario.data.IncomingEvent
 import com.quarenta.calendario.data.IncomingRequest
 import com.quarenta.calendario.data.Task
+import com.quarenta.calendario.data.AppUpdate
+import com.quarenta.calendario.data.Updater
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,9 +99,72 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var observing = false
     private var loadedRange: ClosedRange<LocalDate> = LocalDate.MIN..LocalDate.MIN
 
+    // ---- App updates ------------------------------------------------------------------
+
+    private val _update = MutableStateFlow<AppUpdate?>(null)
+    /** A newer version on GitHub, or null when up to date. */
+    val update: StateFlow<AppUpdate?> = _update.asStateFlow()
+
+    private val _updateProgress = MutableStateFlow<Float?>(null)
+    /** Download progress 0..1 while updating, null otherwise. */
+    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
+
+    private val _refreshing = MutableStateFlow(false)
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
+    private var lastUpdateCheck = 0L
+
+    fun checkForUpdate(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastUpdateCheck < 30 * 60_000) return
+        lastUpdateCheck = now
+        viewModelScope.launch {
+            val found = withContext(Dispatchers.IO) { Updater.check(BuildConfig.VERSION_NAME) }
+            if (found != null || force) _update.value = found
+        }
+    }
+
+    /** Downloads the new version and opens Android's installer (it updates in place). */
+    fun startUpdate() {
+        val update = _update.value ?: return
+        if (_updateProgress.value != null) return
+        val app = getApplication<Application>()
+        if (!Updater.canInstall(app)) {
+            _message.value = "Autoriza a FortyCalendar a instalar atualizações e volta a carregar em Atualizar"
+            Updater.openInstallPermission(app)
+            return
+        }
+        _updateProgress.value = 0f
+        viewModelScope.launch {
+            val apk = withContext(Dispatchers.IO) {
+                Updater.download(app, update) { p -> _updateProgress.value = p }
+            }
+            _updateProgress.value = null
+            if (apk == null) _message.value = "Não foi possível descarregar. Verifica a internet e tenta outra vez."
+            else Updater.install(app, apk)
+        }
+    }
+
+    /** Pull down: reload calendars and people, and look for a new version. */
+    fun pullToRefresh() {
+        if (_refreshing.value) return
+        _refreshing.value = true
+        refresh()
+        refreshPeople()
+        viewModelScope.launch {
+            val found = withContext(Dispatchers.IO) { Updater.check(BuildConfig.VERSION_NAME) }
+            lastUpdateCheck = System.currentTimeMillis()
+            _update.value = found
+            delay(400)
+            _refreshing.value = false
+            if (found == null) _message.value = "Tudo atualizado"
+        }
+    }
+
     init {
         refresh()
         refreshPeople()
+        checkForUpdate()
     }
 
     fun onPermissionResult() {

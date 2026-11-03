@@ -5,6 +5,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// Every build from GitHub gets a higher number, so Android installs it over the previous one.
+val runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "0").toInt()
+// All versions are signed with the same key: without this Android refuses the update
+// and asks to uninstall first. The key file is in the repo; its password is a GitHub secret.
+val keystorePassword: String? = System.getenv("FORTY_KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.quarenta.calendario"
     compileSdk = 35
@@ -13,11 +19,26 @@ android {
         applicationId = "com.quarenta.calendario"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 100 + runNumber
+        versionName = "0.3.$runNumber"
+    }
+
+    signingConfigs {
+        if (keystorePassword != null) {
+            create("forty") {
+                storeFile = rootProject.file("keystore/fortycalendar.p12")
+                storeType = "PKCS12"
+                storePassword = keystorePassword
+                keyAlias = "fortycalendar"
+                keyPassword = keystorePassword
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (keystorePassword != null) signingConfig = signingConfigs.getByName("forty")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -32,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
