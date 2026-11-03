@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +66,7 @@ fun HomeScreen(
     onOpenEvent: (CalendarEvent) -> Unit = {},
     people: List<Person> = emptyList(),
     onOpenPerson: (Person) -> Unit = {},
+    onOpenAppearance: () -> Unit = {},
 ) {
     val today = LocalDate.now()
     val now = Instant.now()
@@ -85,9 +87,20 @@ fun HomeScreen(
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.padding(start = 4.dp, top = 20.dp, bottom = 4.dp)) {
-            Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
-            Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
+        Row(Modifier.padding(start = 4.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
+                Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, color = Bento.Ink)
+            }
+            // Colours of the app: system, light, black or pastel.
+            androidx.compose.material3.IconButton(
+                onClick = onOpenAppearance,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.Palette, contentDescription = "Cores da app", tint = Bento.Purple,
+                )
+            }
         }
 
         if (!hasCalendarAccess) AccessCard(onRequestAccess)
@@ -177,7 +190,7 @@ fun HomeScreen(
                         favourites.take(3).forEachIndexed { i, p ->
                             Box(
                                 Modifier.padding(start = (i * 26).dp).size(44.dp).clip(CircleShape)
-                                    .background(Color.White).padding(2.dp),
+                                    .background(Bento.Tile).padding(2.dp),
                             ) { Avatar(p, 40.dp) }
                         }
                     }

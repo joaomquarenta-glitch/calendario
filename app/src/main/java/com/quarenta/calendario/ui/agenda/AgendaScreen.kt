@@ -238,7 +238,7 @@ private fun EventCard(event: CalendarEvent, isToday: Boolean, onClick: () -> Uni
             }
         }
         event.description?.let {
-            Text(it, fontSize = 14.sp, color = Color(0xFF3A3A3C), maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
+            Text(it, fontSize = 14.sp, color = Bento.Secondary, maxLines = 3, overflow = TextOverflow.Ellipsis, lineHeight = 20.sp)
         }
         Text(event.sources.joinToString(" · "), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Bento.Secondary)
     }

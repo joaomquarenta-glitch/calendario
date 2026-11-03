@@ -63,21 +63,30 @@ import com.quarenta.calendario.data.ContactFormat
 import com.quarenta.calendario.data.ContactGroup
 import com.quarenta.calendario.data.FieldKind
 import com.quarenta.calendario.ui.theme.Bento
+import com.quarenta.calendario.ui.theme.ThemeState
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
 
 /** Soft background + strong accent for each kind of information. */
 data class Pastel(val background: Color, val accent: Color, val icon: ImageVector)
 
 object Pastels {
-    val Mint = Color(0xFFE3F5E9) to Color(0xFF2E9E57)
-    val Sky = Color(0xFFE4EEFD) to Color(0xFF2F6FDB)
-    val Peach = Color(0xFFFFECDF) to Color(0xFFD5641E)
-    val Lavender = Color(0xFFEFE8FB) to Color(0xFF7B52C4)
-    val Rose = Color(0xFFFCE6EE) to Color(0xFFCB3F73)
-    val Aqua = Color(0xFFDFF4F5) to Color(0xFF138C96)
-    val Butter = Color(0xFFFFF4D4) to Color(0xFF9A7300)
-    val Lilac = Color(0xFFEAEAFA) to Color(0xFF5552CF)
-    val Stone = Color(0xFFEFEFF2) to Color(0xFF5E5E66)
-    val WhatsApp = Color(0xFFDCF8E6) to Color(0xFF1DA851)
+    /** Soft colour + accent; in the dark look the soft colour becomes a deep tint of the accent. */
+    private fun p(soft: Long, accent: Long): Pair<Color, Color> {
+        val a = Color(accent)
+        return if (ThemeState.isDark) a.copy(alpha = 0.26f).compositeOver(Bento.Tile) to lerp(a, Color.White, 0.3f)
+        else Color(soft) to a
+    }
+    val Mint get() = p(0xFFE3F5E9, 0xFF2E9E57)
+    val Sky get() = p(0xFFE4EEFD, 0xFF2F6FDB)
+    val Peach get() = p(0xFFFFECDF, 0xFFD5641E)
+    val Lavender get() = p(0xFFEFE8FB, 0xFF7B52C4)
+    val Rose get() = p(0xFFFCE6EE, 0xFFCB3F73)
+    val Aqua get() = p(0xFFDFF4F5, 0xFF138C96)
+    val Butter get() = p(0xFFFFF4D4, 0xFF9A7300)
+    val Lilac get() = p(0xFFEAEAFA, 0xFF5552CF)
+    val Stone get() = p(0xFFEFEFF2, 0xFF5E5E66)
+    val WhatsApp get() = p(0xFFDCF8E6, 0xFF1DA851)
 }
 
 private fun pastelOf(colors: Pair<Color, Color>, icon: ImageVector) = Pastel(colors.first, colors.second, icon)
@@ -132,7 +141,7 @@ fun FieldCard(
             Text(title.uppercase(), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = style.accent, letterSpacing = 0.6.sp)
         }
         rows.forEachIndexed { i, f ->
-            if (i > 0) HorizontalDivider(color = Color.White.copy(alpha = 0.9f), modifier = Modifier.padding(start = 16.dp))
+            if (i > 0) HorizontalDivider(color = Bento.Tile.copy(alpha = 0.7f), modifier = Modifier.padding(start = 16.dp))
             Row(
                 Modifier.fillMaxWidth().clickable { onTap(f) }.padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -159,11 +168,11 @@ sealed interface AddChoice {
     }
     data object Ringtone : AddChoice {
         override val title = "Som de toque"
-        override val style = pastelOf(Pastels.Stone, Icons.Rounded.MusicNote)
+        override val style get() = pastelOf(Pastels.Stone, Icons.Rounded.MusicNote)
     }
     data object Custom : AddChoice {
         override val title = "Campo livre"
-        override val style = pastelOf(Pastels.Stone, Icons.Rounded.TextFields)
+        override val style get() = pastelOf(Pastels.Stone, Icons.Rounded.TextFields)
     }
 }
 
