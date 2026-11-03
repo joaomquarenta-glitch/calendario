@@ -1,11 +1,13 @@
 package com.quarenta.calendario.data
 
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.provider.CalendarContract
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.ZoneOffset
 
 /** One occurrence of an event, read from any calendar account on the phone. */
 data class CalendarEvent(
@@ -17,16 +19,38 @@ data class CalendarEvent(
     val location: String?,
     val description: String?,
     val color: Int,
+    val calendarId: Long,
     val calendarName: String,
     val accountName: String,
+    val canEdit: Boolean,
+    /** Calendars this event was found in, after duplicates are merged. */
+    val sources: List<String> = listOf(calendarName),
+    /** Ids of the other copies merged into this one. */
+    val duplicateIds: List<Long> = emptyList(),
+)
+
+data class CalendarInfo(val id: Long, val name: String, val account: String, val color: Int, val isPrimary: Boolean)
+
+/** What the person fills in (or what an "Add to calendar" button sends) for a new or edited event. */
+data class EventDraft(
+    val title: String = "",
+    val start: Instant = Instant.now(),
+    val end: Instant = Instant.now().plusSeconds(3600),
+    val allDay: Boolean = false,
+    val location: String = "",
+    val description: String = "",
+    val calendarId: Long? = null,
+    val reminderMinutes: Int? = 30,
 )
 
 /**
- * Reads events from Android's calendar store. This covers every account the
- * person already has on the phone (Google, Outlook/Exchange, Samsung, and any
- * CalDAV/iCloud sync app), so the app shows all of them in one agenda.
+ * Reads and writes events in Android's calendar store. This covers every account the
+ * person already has on the phone (Google, Outlook/Exchange, Samsung, CalDAV/iCloud apps),
+ * so the agenda shows all of them and new events sync back to those accounts.
  */
 class CalendarRepository(private val context: Context) {
+
+    private val resolver get() = context.contentResolver
 
     fun eventsBetween(from: LocalDate, toExclusive: LocalDate, zone: ZoneId = ZoneId.systemDefault()): List<CalendarEvent> {
         val begin = from.atStartOfDay(zone).toInstant().toEpochMilli()
@@ -46,12 +70,14 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Instances.EVENT_LOCATION,
             CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.DISPLAY_COLOR,
+            CalendarContract.Instances.CALENDAR_ID,
             CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             CalendarContract.Instances.OWNER_ACCOUNT,
+            CalendarContract.Instances.CALENDAR_ACCESS_LEVEL,
         )
 
         val events = mutableListOf<CalendarEvent>()
-        context.contentResolver.query(
+        resolver.query(
             uri, projection,
             "${CalendarContract.Instances.VISIBLE} = 1",
             null,
@@ -59,28 +85,144 @@ class CalendarRepository(private val context: Context) {
         )?.use { c ->
             while (c.moveToNext()) {
                 val allDay = c.getInt(4) == 1
-                var startMs = c.getLong(2)
-                var endMs = c.getLong(3)
-                if (allDay) {
-                    // All-day events are stored in UTC midnight; shift them to local days.
-                    val utc = ZoneId.of("UTC")
-                    startMs = Instant.ofEpochMilli(startMs).atZone(utc).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
-                    endMs = Instant.ofEpochMilli(endMs).atZone(utc).toLocalDate().atStartOfDay(zone).toInstant().toEpochMilli()
-                }
                 events += CalendarEvent(
                     id = c.getLong(0),
                     title = c.getString(1)?.takeIf { it.isNotBlank() } ?: "(Sem título)",
-                    start = Instant.ofEpochMilli(startMs),
-                    end = Instant.ofEpochMilli(endMs),
+                    start = toLocal(c.getLong(2), allDay, zone),
+                    end = toLocal(c.getLong(3), allDay, zone),
                     allDay = allDay,
                     location = c.getString(5)?.takeIf { it.isNotBlank() },
                     description = c.getString(6)?.takeIf { it.isNotBlank() },
                     color = c.getInt(7),
-                    calendarName = c.getString(8) ?: "",
-                    accountName = c.getString(9) ?: "",
+                    calendarId = c.getLong(8),
+                    calendarName = c.getString(9) ?: "",
+                    accountName = c.getString(10) ?: "",
+                    canEdit = c.getInt(11) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
                 )
             }
         }
         return events.sortedBy { it.start }
     }
+
+    /** One event by id (used when another app asks to show an event). */
+    fun eventById(id: Long, zone: ZoneId = ZoneId.systemDefault()): CalendarEvent? {
+        val projection = arrayOf(
+            CalendarContract.Events._ID,
+            CalendarContract.Events.TITLE,
+            CalendarContract.Events.DTSTART,
+            CalendarContract.Events.DTEND,
+            CalendarContract.Events.ALL_DAY,
+            CalendarContract.Events.EVENT_LOCATION,
+            CalendarContract.Events.DESCRIPTION,
+            CalendarContract.Events.DISPLAY_COLOR,
+            CalendarContract.Events.CALENDAR_ID,
+            CalendarContract.Events.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Events.OWNER_ACCOUNT,
+            CalendarContract.Events.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Events.DURATION,
+        )
+        val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id)
+        return resolver.query(uri, projection, null, null, null)?.use { c ->
+            if (!c.moveToFirst()) return@use null
+            val allDay = c.getInt(4) == 1
+            val startMs = c.getLong(2)
+            val endMs = if (c.isNull(3)) startMs + 3_600_000 else c.getLong(3)
+            CalendarEvent(
+                id = c.getLong(0),
+                title = c.getString(1)?.takeIf { it.isNotBlank() } ?: "(Sem título)",
+                start = toLocal(startMs, allDay, zone),
+                end = toLocal(endMs, allDay, zone),
+                allDay = allDay,
+                location = c.getString(5)?.takeIf { it.isNotBlank() },
+                description = c.getString(6)?.takeIf { it.isNotBlank() },
+                color = c.getInt(7),
+                calendarId = c.getLong(8),
+                calendarName = c.getString(9) ?: "",
+                accountName = c.getString(10) ?: "",
+                canEdit = c.getInt(11) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+            )
+        }
+    }
+
+    /** Calendars the person can add events to, primary first. */
+    fun writableCalendars(): List<CalendarInfo> {
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_COLOR,
+            CalendarContract.Calendars.IS_PRIMARY,
+        )
+        val out = mutableListOf<CalendarInfo>()
+        resolver.query(
+            CalendarContract.Calendars.CONTENT_URI, projection,
+            "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ? AND ${CalendarContract.Calendars.VISIBLE} = 1",
+            arrayOf(CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR.toString()),
+            null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                out += CalendarInfo(
+                    id = c.getLong(0),
+                    name = c.getString(1) ?: "",
+                    account = c.getString(2) ?: "",
+                    color = c.getInt(3),
+                    isPrimary = c.getInt(4) == 1,
+                )
+            }
+        }
+        return out.sortedWith(compareByDescending<CalendarInfo> { it.isPrimary }.thenBy { it.name })
+    }
+
+    /** Saves a new event; returns its id, or null if it could not be saved. */
+    fun insert(draft: EventDraft, zone: ZoneId = ZoneId.systemDefault()): Long? {
+        val calendarId = draft.calendarId ?: writableCalendars().firstOrNull()?.id ?: return null
+        val values = draft.toValues(zone).apply { put(CalendarContract.Events.CALENDAR_ID, calendarId) }
+        val uri = resolver.insert(CalendarContract.Events.CONTENT_URI, values) ?: return null
+        val id = ContentUris.parseId(uri)
+        draft.reminderMinutes?.let { minutes ->
+            resolver.insert(CalendarContract.Reminders.CONTENT_URI, ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, id)
+                put(CalendarContract.Reminders.MINUTES, minutes)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            })
+        }
+        return id
+    }
+
+    fun update(eventId: Long, draft: EventDraft, zone: ZoneId = ZoneId.systemDefault()): Boolean {
+        val values = draft.toValues(zone)
+        draft.calendarId?.let { values.put(CalendarContract.Events.CALENDAR_ID, it) }
+        val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+        return resolver.update(uri, values, null, null) > 0
+    }
+
+    fun delete(eventId: Long): Boolean {
+        val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+        return resolver.delete(uri, null, null) > 0
+    }
+
+    private fun EventDraft.toValues(zone: ZoneId) = ContentValues().apply {
+        put(CalendarContract.Events.TITLE, title.ifBlank { "(Sem título)" })
+        put(CalendarContract.Events.EVENT_LOCATION, location)
+        put(CalendarContract.Events.DESCRIPTION, description)
+        if (allDay) {
+            // The calendar store wants all-day events at UTC midnight.
+            val startDay = start.atZone(zone).toLocalDate()
+            val endDay = maxOf(end.atZone(zone).toLocalDate(), startDay.plusDays(1))
+            put(CalendarContract.Events.DTSTART, startDay.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+            put(CalendarContract.Events.DTEND, endDay.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+            put(CalendarContract.Events.ALL_DAY, 1)
+            put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
+        } else {
+            put(CalendarContract.Events.DTSTART, start.toEpochMilli())
+            put(CalendarContract.Events.DTEND, maxOf(end, start.plusSeconds(60)).toEpochMilli())
+            put(CalendarContract.Events.ALL_DAY, 0)
+            put(CalendarContract.Events.EVENT_TIMEZONE, zone.id)
+        }
+    }
+
+    /** All-day events are stored at UTC midnight; shift them to local days. */
+    private fun toLocal(ms: Long, allDay: Boolean, zone: ZoneId): Instant =
+        if (!allDay) Instant.ofEpochMilli(ms)
+        else Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().atStartOfDay(zone).toInstant()
 }

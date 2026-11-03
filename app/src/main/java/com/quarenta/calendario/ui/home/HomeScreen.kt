@@ -60,6 +60,7 @@ fun HomeScreen(
     onOpenAgenda: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenBento: () -> Unit,
+    onOpenEvent: (CalendarEvent) -> Unit = {},
 ) {
     val today = LocalDate.now()
     val now = Instant.now()
@@ -88,7 +89,7 @@ fun HomeScreen(
         if (!hasCalendarAccess) AccessCard(onRequestAccess)
 
         // Next event: the biggest tile.
-        BentoTile(Modifier.fillMaxWidth(), onClick = onOpenAgenda) {
+        BentoTile(Modifier.fillMaxWidth(), onClick = { if (next != null) onOpenEvent(next) else onOpenAgenda() }) {
             if (next == null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     IconTile(Icons.Rounded.CalendarMonth, Bento.Blue, 48.dp, 26.dp)

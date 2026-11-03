@@ -22,6 +22,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Run tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
 
@@ -37,8 +40,8 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.${{ github.run_number }}
-          name: Calendário Bento 0.1.${{ github.run_number }}
+          tag_name: v0.2.${{ github.run_number }}
+          name: Calendário Bento 0.2.${{ github.run_number }}
           body: Descarrega o ficheiro CalendarioBento.apk abaixo e abre-o no telemóvel para instalar.
           files: CalendarioBento.apk
           make_latest: true

@@ -2,6 +2,7 @@ package com.quarenta.calendario
 
 import android.Manifest
 import android.app.Application
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.os.Handler
@@ -12,9 +13,19 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.quarenta.calendario.data.AppDatabase
 import com.quarenta.calendario.data.CalendarEvent
+import com.quarenta.calendario.data.CalendarInfo
 import com.quarenta.calendario.data.CalendarRepository
+import com.quarenta.calendario.data.ContactsRepository
+import com.quarenta.calendario.data.Person
+import com.quarenta.calendario.data.PersonField
+import com.quarenta.calendario.data.PersonNote
+import com.quarenta.calendario.data.Dedup
+import com.quarenta.calendario.data.EventDraft
+import com.quarenta.calendario.data.IncomingEvent
+import com.quarenta.calendario.data.IncomingRequest
 import com.quarenta.calendario.data.Task
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,51 +37,199 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
+/** Which full-screen sheet is open on top of the tabs. */
+sealed interface Overlay {
+    data class Detail(val event: CalendarEvent) : Overlay
+    /** [editingId] is null for a new event. */
+    data class Editor(val draft: EventDraft, val editingId: Long? = null, val fromOtherApp: Boolean = false) : Overlay
+    data class PersonCard(val person: Person) : Overlay
+}
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val calendars = CalendarRepository(app)
     private val taskDao = AppDatabase.get(app).tasks()
+    private val personDao = AppDatabase.get(app).people()
+    val contacts = ContactsRepository(app)
+
+    private val _hasContactsAccess = MutableStateFlow(checkContacts())
+    val hasContactsAccess: StateFlow<Boolean> = _hasContactsAccess.asStateFlow()
+
+    private val _people = MutableStateFlow<List<Person>>(emptyList())
+    val people: StateFlow<List<Person>> = _people.asStateFlow()
 
     private val _hasCalendarAccess = MutableStateFlow(checkAccess())
     val hasCalendarAccess: StateFlow<Boolean> = _hasCalendarAccess.asStateFlow()
 
     private val _events = MutableStateFlow<List<CalendarEvent>>(emptyList())
+    /** Events from every calendar on the phone, with duplicates merged. */
     val events: StateFlow<List<CalendarEvent>> = _events.asStateFlow()
+
+    private val _writable = MutableStateFlow<List<CalendarInfo>>(emptyList())
+    val writableCalendars: StateFlow<List<CalendarInfo>> = _writable.asStateFlow()
+
+    private val _selectedDate = MutableStateFlow(LocalDate.now())
+    val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
+
+    private val _overlay = MutableStateFlow<Overlay?>(null)
+    val overlay: StateFlow<Overlay?> = _overlay.asStateFlow()
+
+    /** Open sheets, newest last, so "back" returns to the previous one (person -> event -> back to person). */
+    private val stack = mutableListOf<Overlay>()
+
+    private fun push(o: Overlay) { stack += o; _overlay.value = o }
+
+    private fun pop() { stack.removeLastOrNull(); _overlay.value = stack.lastOrNull() }
+
+    private fun replaceAll(o: Overlay) { stack.clear(); push(o) }
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
 
     val tasks: StateFlow<List<Task>> = taskDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    /** Reload whenever any calendar on the phone changes (new sync, edit in another app). */
+    /** Reload whenever any calendar on the phone changes (new sync, edit elsewhere). */
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
         override fun onChange(selfChange: Boolean) = refresh()
     }
     private var observing = false
+    private var loadedRange: ClosedRange<LocalDate> = LocalDate.MIN..LocalDate.MIN
 
     init {
         refresh()
+        refreshPeople()
     }
 
     fun onPermissionResult() {
         _hasCalendarAccess.value = checkAccess()
         refresh()
+        refreshPeople()
+    }
+
+    fun refreshPeople() {
+        _hasContactsAccess.value = checkContacts()
+        if (!checkContacts()) return
+        viewModelScope.launch {
+            _people.value = withContext(Dispatchers.IO) { runCatching { contacts.all() }.getOrDefault(emptyList()) }
+        }
+    }
+
+    fun openPerson(person: Person) = push(Overlay.PersonCard(person))
+
+    fun noteFor(key: String): Flow<PersonNote?> = personDao.observeNote(key)
+    fun fieldsFor(key: String): Flow<List<PersonField>> = personDao.observeFields(key)
+
+    fun saveNote(key: String, text: String) {
+        viewModelScope.launch { personDao.saveNote(PersonNote(lookupKey = key, notes = text)) }
+    }
+
+    fun addField(key: String, label: String, value: String) {
+        if (label.isBlank() && value.isBlank()) return
+        viewModelScope.launch { personDao.addField(PersonField(lookupKey = key, label = label.trim(), value = value.trim())) }
+    }
+
+    fun deleteField(id: Long) {
+        viewModelScope.launch { personDao.deleteField(id) }
+    }
+
+    fun selectDate(date: LocalDate) {
+        val reload = !loadedRange.contains(date)
+        _selectedDate.value = date
+        if (reload) refresh()
     }
 
     fun refresh() {
+        _hasCalendarAccess.value = checkAccess()
         if (!checkAccess()) return
         if (!observing) {
             getApplication<Application>().contentResolver
                 .registerContentObserver(CalendarContract.CONTENT_URI, true, observer)
             observing = true
         }
+        val anchor = minOf(_selectedDate.value, LocalDate.now())
+        val from = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1)
+        val to = maxOf(_selectedDate.value, LocalDate.now()).plusDays(42)
         viewModelScope.launch {
-            val today = LocalDate.now()
-            val from = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            val loaded = withContext(Dispatchers.IO) {
-                runCatching { calendars.eventsBetween(from, today.plusDays(35)) }.getOrDefault(emptyList())
+            val (loaded, writable) = withContext(Dispatchers.IO) {
+                val ev = runCatching { Dedup.merge(calendars.eventsBetween(from, to)) }.getOrDefault(emptyList())
+                val cals = runCatching { calendars.writableCalendars() }.getOrDefault(emptyList())
+                ev to cals
             }
+            loadedRange = from..to.minusDays(1)
             _events.value = loaded
+            _writable.value = writable
         }
     }
+
+    // ---- Overlays: detail and editor ------------------------------------------------
+
+    fun openEvent(event: CalendarEvent) = push(Overlay.Detail(event))
+
+    fun newEvent(date: LocalDate = _selectedDate.value) {
+        val zone = java.time.ZoneId.systemDefault()
+        val now = java.time.LocalTime.now()
+        val hour = if (date == LocalDate.now()) (now.hour + 1).coerceAtMost(23) else 9
+        val start = date.atTime(hour, 0).atZone(zone).toInstant()
+        push(Overlay.Editor(EventDraft(start = start, end = start.plusSeconds(3600))))
+    }
+
+    fun editEvent(event: CalendarEvent) {
+        push(Overlay.Editor(
+            EventDraft(
+                title = event.title, start = event.start, end = event.end, allDay = event.allDay,
+                location = event.location.orEmpty(), description = event.description.orEmpty(),
+                calendarId = event.calendarId, reminderMinutes = null,
+            ),
+            editingId = event.id,
+        ))
+    }
+
+    fun closeOverlay() = pop()
+
+    fun save(draft: EventDraft, editingId: Long?) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (editingId == null) calendars.insert(draft) != null else calendars.update(editingId, draft)
+                }.getOrDefault(false)
+            }
+            if (ok) {
+                pop() // the editor
+                // The event detail underneath now shows old data: close it too.
+                if (editingId != null && stack.lastOrNull() is Overlay.Detail) pop()
+                _message.value = if (editingId == null) "Compromisso guardado" else "Alterações guardadas"
+                _selectedDate.value = draft.start.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                refresh()
+            } else {
+                _message.value = "Não foi possível guardar. Confirma o acesso ao calendário."
+            }
+        }
+    }
+
+    fun delete(event: CalendarEvent) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { calendars.delete(event.id) }.getOrDefault(false) }
+            _message.value = if (ok) "Compromisso apagado" else "Este calendário não permite apagar"
+            if (ok) { if (stack.lastOrNull() is Overlay.Detail) pop(); refresh() }
+        }
+    }
+
+    fun messageShown() { _message.value = null }
+
+    /** Handles "Add to calendar" buttons and .ics files sent by other apps. */
+    fun handleIntent(intent: Intent?) {
+        val request = IncomingEvent.parse(getApplication(), intent) ?: return
+        when (request) {
+            is IncomingRequest.Add -> replaceAll(Overlay.Editor(request.draft, fromOtherApp = true))
+            is IncomingRequest.Show -> viewModelScope.launch {
+                val e = withContext(Dispatchers.IO) { runCatching { calendars.eventById(request.eventId) }.getOrNull() }
+                if (e != null) replaceAll(Overlay.Detail(e))
+            }
+        }
+    }
+
+    // ---- Tasks ---------------------------------------------------------------------
 
     fun addTask(title: String, due: LocalDate? = LocalDate.now()) {
         if (title.isBlank()) return
@@ -84,6 +243,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteTask(task: Task) {
         viewModelScope.launch { taskDao.delete(task.id) }
     }
+
+    private fun checkContacts(): Boolean =
+        ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.READ_CONTACTS) ==
+            PackageManager.PERMISSION_GRANTED
 
     private fun checkAccess(): Boolean =
         ContextCompat.checkSelfPermission(getApplication(), Manifest.permission.READ_CALENDAR) ==
