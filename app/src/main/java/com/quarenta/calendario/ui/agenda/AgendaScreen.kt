@@ -97,13 +97,14 @@ fun AgendaScreen(
     onNewEvent: () -> Unit,
     people: List<Person> = emptyList(),
     photoFor: suspend (Person) -> Bitmap? = { null },
+    birthYearFor: suspend (Person) -> Int? = { null },
 ) {
     // First the big cards; "Ver todos os compromissos" opens the full list.
     var showAll by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = showAll) { showAll = false }
     if (!showAll) {
         HighlightsPage(
-            events = events, people = people, photoFor = photoFor, hasCalendarAccess = hasCalendarAccess,
+            events = events, people = people, photoFor = photoFor, birthYearFor = birthYearFor, hasCalendarAccess = hasCalendarAccess,
             onRequestAccess = onRequestAccess, onOpenEvent = onOpenEvent, onNewEvent = onNewEvent,
             onShowAll = { showAll = true },
         )
@@ -315,6 +316,7 @@ private fun HighlightsPage(
     events: List<CalendarEvent>,
     people: List<Person>,
     photoFor: suspend (Person) -> Bitmap?,
+    birthYearFor: suspend (Person) -> Int?,
     hasCalendarAccess: Boolean,
     onRequestAccess: () -> Unit,
     onOpenEvent: (CalendarEvent) -> Unit,
@@ -352,7 +354,7 @@ private fun HighlightsPage(
                 Text("Toca em + para marcar um.", fontSize = 15.sp, color = Bento.Secondary)
             }
         } else {
-            AgendaHighlights(upcoming, people, photoFor, onOpenEvent, Modifier.fillMaxWidth())
+            AgendaHighlights(upcoming, people, photoFor, onOpenEvent, Modifier.fillMaxWidth(), birthYearFor)
         }
 
         Row(

@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Cake
-import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,11 +51,9 @@ import com.quarenta.calendario.data.ContactFormat
 import com.quarenta.calendario.data.Person
 import com.quarenta.calendario.reminders.PersonMatch
 import com.quarenta.calendario.ui.composeColor
-import com.quarenta.calendario.ui.dayHeading
 import com.quarenta.calendario.ui.localDate
-import com.quarenta.calendario.ui.startsIn
+import com.quarenta.calendario.ui.localTime
 import com.quarenta.calendario.ui.theme.Bento
-import com.quarenta.calendario.ui.timeRange
 import java.time.LocalDate
 import kotlin.math.absoluteValue
 
@@ -72,6 +69,7 @@ fun AgendaHighlights(
     photoFor: suspend (Person) -> Bitmap?,
     onOpenEvent: (CalendarEvent) -> Unit,
     modifier: Modifier = Modifier,
+    birthYearFor: suspend (Person) -> Int? = { null },
 ) {
     val today = LocalDate.now()
     val namesById = remember(people) { people.map { it.id to it.name } }
@@ -105,7 +103,7 @@ fun AgendaHighlights(
                         alpha = 1f - 0.25f * offset
                     },
                 ) {
-                    HighlightCard(event, person, photoFor, today) { onOpenEvent(event) }
+                    HighlightCard(event, person, photoFor, birthYearFor, today) { onOpenEvent(event) }
                 }
             }
         }
@@ -121,12 +119,16 @@ private fun HighlightCard(
     event: CalendarEvent,
     person: Person?,
     photoFor: suspend (Person) -> Bitmap?,
+    birthYearFor: suspend (Person) -> Int?,
     today: LocalDate,
     onOpen: () -> Unit,
 ) {
     val color = event.composeColor()
     val photo by produceState<Bitmap?>(null, person?.id) { value = person?.let { photoFor(it) } }
     val birthday = Highlights.isBirthday(event.title, event.sources)
+    val birthYear by produceState<Int?>(null, person?.id, birthday) {
+        value = if (birthday && person != null) birthYearFor(person) else null
+    }
 
     Box(
         Modifier.fillMaxSize().clip(RoundedCornerShape(30.dp)).clickable(onClick = onOpen),
@@ -165,40 +167,60 @@ private fun HighlightCard(
         // Darker towards the bottom so the white text is always readable.
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.78f)),
+                Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f)),
             ),
         )
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 22.dp),
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             val day = event.start.localDate()
-            val soon = if (day == today) startsIn(event) else null
-            Text(
-                listOfNotNull(if (birthday) "Aniversário" else null, dayHeading(day, today), soon).joinToString(" · "),
-                color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
-            )
-            Text(
-                event.title, color = Color.White, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis,
-            )
-            Text(event.timeRange(), color = Color.White.copy(alpha = 0.9f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            event.location?.let {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.LocationOn, contentDescription = null, tint = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(it, color = Color.White.copy(alpha = 0.85f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val whenText = Highlights.shortDay(day, today) +
+                (if (event.allDay) "" else " · ${event.start.localTime()}")
+            when {
+                // The photo already says who it is: only the occasion and the day.
+                birthday -> Text(
+                    Highlights.birthdayLabel(birthYear, day, today).replaceFirstChar { it.uppercase() },
+                    color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center,
+                )
+                bitmap != null -> {
+                    Text(
+                        withoutName(event.title, person), color = Color.White, fontSize = 24.sp, lineHeight = 28.sp,
+                        fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(whenText.replaceFirstChar { it.uppercase() }, color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                }
+                else -> {
+                    Text(
+                        event.title, color = Color.White, fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(whenText.replaceFirstChar { it.uppercase() }, color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+            // Small, frosted "Abrir": the whole card opens too.
             Text(
-                "Abrir", color = Color.Black, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onOpen)
-                    .padding(horizontal = 34.dp, vertical = 12.dp),
+                "Abrir", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.24f))
+                    .clickable(onClick = onOpen).padding(horizontal = 18.dp, vertical = 7.dp),
             )
         }
     }
+}
+
+/** "Jantar com Ana Sousa" with Ana's photo becomes "Jantar com"... so drop a trailing "com"/"-" as well. */
+private fun withoutName(title: String, person: Person?): String {
+    if (person == null) return title
+    val words = person.name.trim().split(Regex("\\s+"))
+    var t = title
+    listOf(person.name.trim(), "${words.first()} ${words.last()}").forEach { n ->
+        t = t.replace(n, "", ignoreCase = true)
+    }
+    t = t.trim().trimEnd('-', '·', ',', ':').trim()
+    t = t.removeSuffix(" com").removeSuffix(" e").removeSuffix(" de").trim()
+    return t.ifBlank { title }
 }
 
 /** Page dots; the current one stretches into a pill, like on Apple's carousels. */
