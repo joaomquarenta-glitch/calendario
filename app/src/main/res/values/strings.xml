@@ -1,3 +1,6 @@
 <resources>
     <string name="app_name">FortyCalendar</string>
+    <string name="widget_next_label">PRÓXIMO</string>
+    <string name="widget_next_empty">Sem compromissos</string>
+    <string name="widget_next_description">O próximo compromisso, com a foto da pessoa</string>
 </resources>

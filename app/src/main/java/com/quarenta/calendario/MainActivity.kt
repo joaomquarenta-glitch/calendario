@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
         // Reminders follow any change made while the app was closed.
         val app = applicationContext
         Thread { runCatching { ReminderScheduler.reschedule(app) } }.start()
+        com.quarenta.calendario.widget.NextWidget.refresh(app)
         vm.refresh()
         vm.refreshPeople()
         vm.checkForUpdate()

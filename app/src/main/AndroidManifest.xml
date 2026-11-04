@@ -118,6 +118,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- Home-screen widget: the next event with the person's photo -->
+        <receiver
+            android:name=".widget.NextWidget"
+            android:exported="false"
+            android:label="Próximo">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.updates"
