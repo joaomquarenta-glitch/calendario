@@ -380,12 +380,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save(draft: EventDraft, editingId: Long?) {
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
+            // Where the occurrence was before editing, so a repeating event moves by the same amount.
+            val originalStart = (stack.lastOrNull { it is Overlay.Editor } as? Overlay.Editor)?.draft?.start
+            val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    if (editingId == null) calendars.insert(draft) != null else calendars.update(editingId, draft)
-                }.getOrDefault(false)
+                    if (editingId == null) {
+                        if (calendars.insert(draft) != null) CalendarRepository.UpdateResult.Saved else CalendarRepository.UpdateResult.Failed
+                    } else {
+                        calendars.update(editingId, draft, originalStart)
+                    }
+                }.getOrDefault(CalendarRepository.UpdateResult.Failed)
             }
-            if (ok) {
+            if (result == CalendarRepository.UpdateResult.ReadOnly) {
+                _message.value = "Este compromisso vem de um calendário que só deixa ler. Não pode ser alterado aqui."
+                return@launch
+            }
+            if (result == CalendarRepository.UpdateResult.Saved) {
                 pop() // the editor
                 // The event detail underneath now shows old data: close it too.
                 if (editingId != null && stack.lastOrNull() is Overlay.Detail) pop()

@@ -189,11 +189,68 @@ class CalendarRepository(private val context: Context) {
         return id
     }
 
-    fun update(eventId: Long, draft: EventDraft, zone: ZoneId = ZoneId.systemDefault()): Boolean {
-        val values = draft.toValues(zone)
-        draft.calendarId?.let { values.put(CalendarContract.Events.CALENDAR_ID, it) }
+    enum class UpdateResult { Saved, ReadOnly, Failed }
+
+    /**
+     * Saves changes to an existing event.
+     *  - Repeating events (yearly anniversaries, weekly meetings...) are stored with a length
+     *    (DURATION) instead of an end, and the calendar store refuses them with an end; the
+     *    whole series moves by as much as this occurrence was moved ([originalStart] -> new start).
+     *  - Moving to another calendar is a copy into the new one and a delete from the old one,
+     *    which every calendar account accepts.
+     */
+    fun update(eventId: Long, draft: EventDraft, originalStart: Instant? = null, zone: ZoneId = ZoneId.systemDefault()): UpdateResult {
         val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
-        return resolver.update(uri, values, null, null) > 0
+        val current = resolver.query(
+            uri,
+            arrayOf(
+                CalendarContract.Events.CALENDAR_ID, CalendarContract.Events.RRULE, CalendarContract.Events.DTSTART,
+                CalendarContract.Events.CALENDAR_ACCESS_LEVEL,
+            ),
+            null, null, null,
+        )?.use { c -> if (c.moveToFirst()) Current(c.getLong(0), c.getString(1), c.getLong(2), c.getInt(3)) else null }
+            ?: return UpdateResult.Failed
+        if (current.accessLevel < CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR) return UpdateResult.ReadOnly
+
+        val values = draft.toValues(zone)
+        if (!current.rrule.isNullOrBlank()) {
+            val start = values.getAsLong(CalendarContract.Events.DTSTART)
+            val end = values.getAsLong(CalendarContract.Events.DTEND)
+            values.remove(CalendarContract.Events.DTEND)
+            values.putNull(CalendarContract.Events.DTEND)
+            values.put(CalendarContract.Events.DURATION, EventRules.duration(end - start, draft.allDay))
+            val shift = originalStart?.let { draft.start.toEpochMilli() - it.toEpochMilli() } ?: 0L
+            values.put(CalendarContract.Events.DTSTART, EventRules.seriesStart(current.dtStart, shift, draft.allDay))
+            values.put(CalendarContract.Events.RRULE, current.rrule)
+        }
+
+        val target = draft.calendarId
+        if (target != null && target != current.calendarId) {
+            values.put(CalendarContract.Events.CALENDAR_ID, target)
+            val copy = resolver.insert(CalendarContract.Events.CONTENT_URI, values) ?: return UpdateResult.Failed
+            copyReminders(eventId, ContentUris.parseId(copy))
+            resolver.delete(uri, null, null)
+            return UpdateResult.Saved
+        }
+        return if (resolver.update(uri, values, null, null) > 0) UpdateResult.Saved else UpdateResult.Failed
+    }
+
+    private data class Current(val calendarId: Long, val rrule: String?, val dtStart: Long, val accessLevel: Int)
+
+    private fun copyReminders(from: Long, to: Long) {
+        resolver.query(
+            CalendarContract.Reminders.CONTENT_URI,
+            arrayOf(CalendarContract.Reminders.MINUTES, CalendarContract.Reminders.METHOD),
+            "${CalendarContract.Reminders.EVENT_ID} = ?", arrayOf(from.toString()), null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                resolver.insert(CalendarContract.Reminders.CONTENT_URI, ContentValues().apply {
+                    put(CalendarContract.Reminders.EVENT_ID, to)
+                    put(CalendarContract.Reminders.MINUTES, c.getInt(0))
+                    put(CalendarContract.Reminders.METHOD, c.getInt(1))
+                })
+            }
+        }
     }
 
     fun delete(eventId: Long): Boolean {
