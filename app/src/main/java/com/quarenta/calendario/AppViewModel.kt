@@ -1,5 +1,7 @@
 package com.quarenta.calendario
 
+import com.quarenta.calendario.reminders.ReminderAlert
+
 import android.Manifest
 import com.quarenta.calendario.ui.theme.ThemeState
 import com.quarenta.calendario.ui.theme.Themes
@@ -49,6 +51,7 @@ sealed interface Overlay {
     data class Editor(val draft: EventDraft, val editingId: Long? = null, val fromOtherApp: Boolean = false) : Overlay
     data class PersonCard(val person: Person) : Overlay
     data object Appearance : Overlay
+    data object Reminders : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -174,6 +177,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _hasCalendarAccess.value = checkAccess()
         refresh()
         refreshPeople()
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) { runCatching { com.quarenta.calendario.reminders.ReminderScheduler.reschedule(app) } }
     }
 
     fun refreshPeople() {
@@ -187,6 +192,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openPerson(person: Person) = push(Overlay.PersonCard(person))
 
     fun openAppearance() = push(Overlay.Appearance)
+
+    fun openReminders() = push(Overlay.Reminders)
+
+    // Full-size contact photos for the big agenda cards, decoded once and kept while the app is open.
+    private val photoCache = android.util.LruCache<Long, android.graphics.Bitmap>(24)
+
+    /** The largest photo the phone has for [person], or null. Runs off the main thread. */
+    suspend fun photoFor(person: Person): android.graphics.Bitmap? {
+        photoCache.get(person.id)?.let { return it }
+        val bitmap = withContext(Dispatchers.IO) { runCatching { contacts.photo(person) }.getOrNull() } ?: return null
+        photoCache.put(person.id, bitmap)
+        return bitmap
+    }
+
+    /** For "Experimentar": the next event on the agenda, or an example when there is none. */
+    fun sampleReminder(): ReminderAlert {
+        val now = java.time.Instant.now()
+        val e = events.value.firstOrNull { !it.allDay && it.start.isAfter(now) }
+        return if (e != null) ReminderAlert(
+            e.id, e.title, e.start.toEpochMilli(), e.end.toEpochMilli(), false, e.location, e.color, now.toEpochMilli(),
+        ) else ReminderAlert(
+            -1, "Exemplo: café às 10h", now.plusSeconds(900).toEpochMilli(), now.plusSeconds(4500).toEpochMilli(),
+            false, "Pastelaria do bairro", 0, now.toEpochMilli(),
+        )
+    }
 
     private val prefs = app.getSharedPreferences("forty", android.content.Context.MODE_PRIVATE)
 

@@ -77,6 +77,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.quarenta.calendario.ui.theme.CalendarioTheme
+import com.quarenta.calendario.ui.settings.RemindersScreen
+import com.quarenta.calendario.reminders.ReminderScheduler
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     Home("Início", Icons.Rounded.Dashboard),
@@ -109,6 +111,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Reminders follow any change made while the app was closed.
+        val app = applicationContext
+        Thread { runCatching { ReminderScheduler.reschedule(app) } }.start()
         vm.refresh()
         vm.refreshPeople()
         vm.checkForUpdate()
@@ -140,6 +145,19 @@ private fun App(vm: AppViewModel) {
         permission.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
     }
     val requestContacts = { permission.launch(arrayOf(Manifest.permission.READ_CONTACTS)) }
+
+    // Reminders need notifications (Android 13+ asks). Ask once, when the calendar is already shared.
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        Thread { ReminderScheduler.reschedule(context.applicationContext) }.start()
+    }
+    LaunchedEffect(hasAccess) {
+        val prefs = context.getSharedPreferences("forty", android.content.Context.MODE_PRIVATE)
+        if (hasAccess && android.os.Build.VERSION.SDK_INT >= 33 && !prefs.getBoolean("asked_notifications", false)) {
+            prefs.edit().putBoolean("asked_notifications", true).apply()
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     // Starring and editing a card write to the phone's contacts, so Android asks once for permission.
     var afterWriteGranted by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -221,6 +239,7 @@ private fun App(vm: AppViewModel) {
                         people = people,
                         onOpenPerson = vm::openPerson,
                         onOpenAppearance = vm::openAppearance,
+                        onOpenReminders = vm::openReminders,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -230,6 +249,8 @@ private fun App(vm: AppViewModel) {
                         onSelectDate = vm::selectDate,
                         onOpenEvent = vm::openEvent,
                         onNewEvent = { vm.newEvent() },
+                        people = people,
+                        photoFor = vm::photoFor,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
@@ -276,6 +297,7 @@ private fun App(vm: AppViewModel) {
                 onSelect = vm::setTheme,
                 onClose = vm::closeOverlay,
             )
+            Overlay.Reminders -> RemindersScreen(onClose = vm::closeOverlay, sample = vm::sampleReminder)
             is Overlay.PersonCard -> {
                 val key = o.person.lookupKey
                 val noteFlow = remember(key) { vm.noteFor(key) }

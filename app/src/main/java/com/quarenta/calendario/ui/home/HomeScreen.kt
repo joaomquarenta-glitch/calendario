@@ -67,6 +67,7 @@ fun HomeScreen(
     people: List<Person> = emptyList(),
     onOpenPerson: (Person) -> Unit = {},
     onOpenAppearance: () -> Unit = {},
+    onOpenReminders: () -> Unit = {},
 ) {
     val today = LocalDate.now()
     val now = Instant.now()
@@ -92,6 +93,16 @@ fun HomeScreen(
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
                 Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, color = Bento.Ink)
             }
+            // Full-screen reminders: on/off, permissions, colour.
+            androidx.compose.material3.IconButton(
+                onClick = onOpenReminders,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.NotificationsActive, contentDescription = "Lembretes", tint = Bento.Orange,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             // Colours of the app: system, light, black or pastel.
             androidx.compose.material3.IconButton(
                 onClick = onOpenAppearance,
