@@ -261,6 +261,7 @@ private fun App(vm: AppViewModel) {
                         hasContactsAccess = hasContacts,
                         onRequestAccess = requestContacts,
                         onOpenPerson = vm::openPerson,
+                        onDeletePerson = { p -> withWriteAccess { vm.deletePerson(p) } },
                     )
                     Tab.Tasks -> TasksScreen(
                         tasks = tasks,

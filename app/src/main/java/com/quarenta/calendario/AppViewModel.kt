@@ -287,6 +287,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Deletes a person from the phone's contacts and closes their card if it is open. */
+    fun deletePerson(person: Person) {
+        if (!canWriteContacts()) {
+            _message.value = "Sem autorização para alterar os contactos"
+            return
+        }
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { contacts.delete(person) }
+            if (!ok) {
+                _message.value = "Não foi possível apagar ${person.name}"
+                return@launch
+            }
+            stack.removeAll { it is Overlay.PersonCard && it.person.id == person.id }
+            _overlay.value = stack.lastOrNull()
+            photoCache.remove(person.id)
+            _people.value = _people.value.filter { it.id != person.id }
+            _message.value = "${person.name} foi apagado dos contactos"
+            refreshPeople()
+        }
+    }
+
     fun noteFor(key: String): Flow<PersonNote?> = personDao.observeNote(key)
     fun fieldsFor(key: String): Flow<List<PersonField>> = personDao.observeFields(key)
 
