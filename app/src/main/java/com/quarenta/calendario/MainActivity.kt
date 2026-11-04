@@ -240,6 +240,8 @@ private fun App(vm: AppViewModel) {
                         onOpenPerson = vm::openPerson,
                         onOpenAppearance = vm::openAppearance,
                         onOpenReminders = vm::openReminders,
+                        photoFor = vm::photoFor,
+                        birthYearFor = vm::birthYearFor,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
