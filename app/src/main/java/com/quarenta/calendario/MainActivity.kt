@@ -251,6 +251,7 @@ private fun App(vm: AppViewModel) {
                         onNewEvent = { vm.newEvent() },
                         people = people,
                         photoFor = vm::photoFor,
+                        birthYearFor = vm::birthYearFor,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
@@ -278,12 +279,25 @@ private fun App(vm: AppViewModel) {
                 // Registers as hit so taps never fall through to the tab underneath.
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) { when (o) {
-            is Overlay.Detail -> EventDetailScreen(
-                event = o.event,
-                onClose = vm::closeOverlay,
-                onEdit = { vm.editEvent(o.event) },
-                onDelete = { vm.delete(o.event) },
-            )
+            is Overlay.Detail -> {
+                val key = com.quarenta.calendario.ui.agenda.Highlights.planKey(
+                    o.event.id, o.event.start.atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
+                )
+                val planFlow = remember(key) { vm.planFor(key) }
+                val plan by planFlow.collectAsStateWithLifecycle(null)
+                val person = remember(o.event.id, people) { vm.personIn(o.event) }
+                EventDetailScreen(
+                    event = o.event,
+                    onClose = vm::closeOverlay,
+                    onEdit = { vm.editEvent(o.event) },
+                    onDelete = { vm.delete(o.event) },
+                    person = person,
+                    photoFor = vm::photoFor,
+                    birthYearFor = vm::birthYearFor,
+                    plan = plan,
+                    onSavePlan = vm::savePlan,
+                )
+            }
             is Overlay.Editor -> EventEditorScreen(
                 initial = o.draft,
                 isNew = o.editingId == null,

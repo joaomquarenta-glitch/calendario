@@ -1,6 +1,7 @@
 package com.quarenta.calendario
 
 import com.quarenta.calendario.reminders.ReminderAlert
+import com.quarenta.calendario.data.EventPlan
 
 import android.Manifest
 import com.quarenta.calendario.ui.theme.ThemeState
@@ -197,6 +198,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // Full-size contact photos for the big agenda cards, decoded once and kept while the app is open.
     private val photoCache = android.util.LruCache<Long, android.graphics.Bitmap>(24)
+
+    private val birthYears = mutableMapOf<Long, Int?>()
+
+    /** The person's year of birth from the phone's contacts, for "34º aniversário". */
+    suspend fun birthYearFor(person: Person): Int? {
+        if (birthYears.containsKey(person.id)) return birthYears[person.id]
+        val year = withContext(Dispatchers.IO) { runCatching { contacts.details(person).birthYear }.getOrNull() }
+        birthYears[person.id] = year
+        return year
+    }
+
+    private val planDao = AppDatabase.get(app).plans()
+
+    fun planFor(key: String): Flow<EventPlan?> = planDao.observe(key)
+
+    fun savePlan(plan: EventPlan) {
+        viewModelScope.launch { planDao.save(plan.copy(updatedAt = System.currentTimeMillis())) }
+    }
+
+    /** The contact an event is about, found by name in its title. */
+    fun personIn(event: CalendarEvent): Person? {
+        val list = people.value
+        val id = com.quarenta.calendario.reminders.PersonMatch.inTitle(event.title, list.map { it.id to it.name }) ?: return null
+        return list.firstOrNull { it.id == id }
+    }
 
     /** The largest photo the phone has for [person], or null. Runs off the main thread. */
     suspend fun photoFor(person: Person): android.graphics.Bitmap? {
