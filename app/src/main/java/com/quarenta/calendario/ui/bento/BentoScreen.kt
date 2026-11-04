@@ -71,15 +71,22 @@ fun avatarColor(name: String): Color = avatarColors[(name.hashCode() and 0x7ffff
 
 fun initials(name: String): String = com.quarenta.calendario.data.ContactFormat.initials(name)
 
+private fun scaledDown(b: android.graphics.Bitmap, maxPx: Int): android.graphics.Bitmap {
+    val longest = maxOf(b.width, b.height)
+    if (longest <= maxPx) return b
+    val f = maxPx.toFloat() / longest
+    return android.graphics.Bitmap.createScaledBitmap(b, (b.width * f).toInt().coerceAtLeast(1), (b.height * f).toInt().coerceAtLeast(1), true)
+}
+
 /** Loads a contact photo off the main thread, in full size when [full] is true. */
 @Composable
-fun rememberContactPhoto(person: Person, full: Boolean): ImageBitmap? {
+fun rememberContactPhoto(person: Person, full: Boolean, maxPx: Int? = null): ImageBitmap? {
     val context = LocalContext.current
     val state by produceState<ImageBitmap?>(null, person.id, full) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 if (full) {
-                    com.quarenta.calendario.data.ContactsRepository(context).photo(person)?.asImageBitmap()
+                    com.quarenta.calendario.data.ContactsRepository(context).photo(person)?.let { b -> if (maxPx != null) scaledDown(b, maxPx) else b }?.asImageBitmap()
                 } else {
                     person.thumbUri?.let { uri ->
                         context.contentResolver.openInputStream(android.net.Uri.parse(uri))?.use {
@@ -172,7 +179,7 @@ fun BentoScreen(
         }
         if (favourites.isNotEmpty() && q.isBlank()) {
             item(span = { GridItemSpan(maxLineSpan) }) { Label("FAVORITOS") }
-            items(favourites, key = { "f${it.id}" }) { person -> PhotoTile(person, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
+            items(favourites, key = { "f${it.id}" }) { person -> PhotoTile(person, person.name.substringBefore(' '), onLongClick = { toDelete = person }) { onOpenPerson(person) } }
             item(span = { GridItemSpan(maxLineSpan) }) { Label("TODOS") }
         } else if (q.isBlank() && filtered.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -182,7 +189,8 @@ fun BentoScreen(
                 )
             }
         }
-        items(filtered, key = { it.id }) { person -> PersonTile(person, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
+        // Everyone the same way as the favourites: the photo fills the tile, the name along the bottom.
+        items(filtered, key = { it.id }) { person -> PhotoTile(person, person.name, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
         if (filtered.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Text("Nenhuma pessoa encontrada.", color = Bento.Secondary, modifier = Modifier.padding(8.dp))
@@ -196,10 +204,11 @@ private fun Label(text: String) {
     Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
 }
 
-/** Favourites: the photo fills the whole tile. */
+/** A person as a photo that fills the whole tile, with [label] along the bottom. */
 @Composable
-private fun PhotoTile(person: Person, onLongClick: () -> Unit, onClick: () -> Unit) {
-    val photo = rememberContactPhoto(person, full = true)
+private fun PhotoTile(person: Person, label: String, onLongClick: () -> Unit, onClick: () -> Unit) {
+    // Sharp for a tile a third of the screen wide, without holding every full-size photo in memory.
+    val photo = rememberContactPhoto(person, full = true, maxPx = 640)
     Box(
         Modifier.fillMaxWidth().aspectRatio(0.8f).clip(RoundedCornerShape(22.dp))
             .background(avatarColor(person.name)).holdable(onClick, onLongClick),
@@ -210,23 +219,11 @@ private fun PhotoTile(person: Person, onLongClick: () -> Unit, onClick: () -> Un
             Text(initials(person.name), color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, modifier = Modifier.align(Alignment.Center))
         }
         Text(
-            person.name.substringBefore(' '),
-            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            label,
+            color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp, lineHeight = 17.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.35f)).padding(horizontal = 10.dp, vertical = 6.dp),
         )
-    }
-}
-
-@Composable
-private fun PersonTile(person: Person, onLongClick: () -> Unit, onClick: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Bento.Tile).holdable(onClick, onLongClick).padding(vertical = 14.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Avatar(person, 64.dp)
-        Text(person.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
     }
 }
 
