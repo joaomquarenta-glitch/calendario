@@ -36,6 +36,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.rounded.ViewAgenda
+import androidx.compose.material.icons.rounded.ViewCarousel
+import android.graphics.Bitmap
+import com.quarenta.calendario.data.Person
+import com.quarenta.calendario.ui.weekdayLong
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,7 +95,20 @@ fun AgendaScreen(
     onSelectDate: (LocalDate) -> Unit,
     onOpenEvent: (CalendarEvent) -> Unit,
     onNewEvent: () -> Unit,
+    people: List<Person> = emptyList(),
+    photoFor: suspend (Person) -> Bitmap? = { null },
 ) {
+    // First the big cards; "Ver todos os compromissos" opens the full list.
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    BackHandler(enabled = showAll) { showAll = false }
+    if (!showAll) {
+        HighlightsPage(
+            events = events, people = people, photoFor = photoFor, hasCalendarAccess = hasCalendarAccess,
+            onRequestAccess = onRequestAccess, onOpenEvent = onOpenEvent, onNewEvent = onNewEvent,
+            onShowAll = { showAll = true },
+        )
+        return
+    }
     val context = LocalContext.current
     val today = LocalDate.now()
     val listState = rememberLazyListState()
@@ -113,6 +139,9 @@ fun AgendaScreen(
         item {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Agenda", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
+                IconButton(onClick = { showAll = false }) {
+                    Icon(Icons.Rounded.ViewCarousel, contentDescription = "Ver em destaque", tint = Bento.Blue)
+                }
                 if (selectedDate != today) {
                     TextButton(onClick = { onSelectDate(today) }) { Text("Hoje", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
                 }
@@ -278,6 +307,63 @@ fun TaskCheck(done: Boolean) {
         contentAlignment = Alignment.Center,
     ) {
         if (done) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun HighlightsPage(
+    events: List<CalendarEvent>,
+    people: List<Person>,
+    photoFor: suspend (Person) -> Bitmap?,
+    hasCalendarAccess: Boolean,
+    onRequestAccess: () -> Unit,
+    onOpenEvent: (CalendarEvent) -> Unit,
+    onNewEvent: () -> Unit,
+    onShowAll: () -> Unit,
+) {
+    val now = System.currentTimeMillis()
+    val upcoming = remember(events) {
+        Highlights.upcoming(events, now, endMs = { it.end.toEpochMilli() }, startMs = { it.start.toEpochMilli() })
+    }
+    val today = LocalDate.now()
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
+                Text("Agenda", style = MaterialTheme.typography.displaySmall, color = Bento.Ink)
+            }
+            IconButton(
+                onClick = onNewEvent,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Blue),
+            ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", tint = Color.White) }
+        }
+        if (!hasCalendarAccess) Box(Modifier.padding(horizontal = 16.dp)) { AccessCard(onRequestAccess) }
+
+        if (upcoming.isEmpty()) {
+            Column(
+                Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(Bento.Tile).padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IconTile(Icons.Rounded.CalendarMonth, Bento.Blue, 64.dp, 34.dp)
+                Text("Sem compromissos marcados", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+                Text("Toca em + para marcar um.", fontSize = 15.sp, color = Bento.Secondary)
+            }
+        } else {
+            AgendaHighlights(upcoming, people, photoFor, onOpenEvent, Modifier.fillMaxWidth())
+        }
+
+        Row(
+            Modifier.padding(horizontal = 16.dp).fillMaxWidth().height(58.dp).clip(RoundedCornerShape(20.dp))
+                .background(Bento.Tile).clickable(onClick = onShowAll),
+            horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.ViewAgenda, contentDescription = null, tint = Bento.Blue)
+            Spacer(Modifier.size(10.dp))
+            Text("Ver todos os compromissos", color = Bento.BlueText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

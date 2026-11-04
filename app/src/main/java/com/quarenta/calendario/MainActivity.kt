@@ -249,6 +249,8 @@ private fun App(vm: AppViewModel) {
                         onSelectDate = vm::selectDate,
                         onOpenEvent = vm::openEvent,
                         onNewEvent = { vm.newEvent() },
+                        people = people,
+                        photoFor = vm::photoFor,
                     )
                     Tab.People -> BentoScreen(
                         people = people,

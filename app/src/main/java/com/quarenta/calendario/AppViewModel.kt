@@ -195,6 +195,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openReminders() = push(Overlay.Reminders)
 
+    // Full-size contact photos for the big agenda cards, decoded once and kept while the app is open.
+    private val photoCache = android.util.LruCache<Long, android.graphics.Bitmap>(24)
+
+    /** The largest photo the phone has for [person], or null. Runs off the main thread. */
+    suspend fun photoFor(person: Person): android.graphics.Bitmap? {
+        photoCache.get(person.id)?.let { return it }
+        val bitmap = withContext(Dispatchers.IO) { runCatching { contacts.photo(person) }.getOrNull() } ?: return null
+        photoCache.put(person.id, bitmap)
+        return bitmap
+    }
+
     /** For "Experimentar": the next event on the agenda, or an example when there is none. */
     fun sampleReminder(): ReminderAlert {
         val now = java.time.Instant.now()
