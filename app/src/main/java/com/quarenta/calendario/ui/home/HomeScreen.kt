@@ -1,5 +1,24 @@
 package com.quarenta.calendario.ui.home
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material.icons.rounded.Cake
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.ContentScale
+import com.quarenta.calendario.data.ContactFormat
+import com.quarenta.calendario.reminders.PersonMatch
+import com.quarenta.calendario.ui.agenda.Highlights
+import com.quarenta.calendario.ui.agenda.withoutName
+import com.quarenta.calendario.ui.localDate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +38,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.Palette
@@ -42,16 +60,12 @@ import com.quarenta.calendario.ui.AccessCard
 import com.quarenta.calendario.ui.bento.Avatar
 import com.quarenta.calendario.ui.components.BentoTile
 import com.quarenta.calendario.ui.components.IconTile
-import com.quarenta.calendario.ui.components.ProgressBar
 import com.quarenta.calendario.ui.composeColor
 import com.quarenta.calendario.ui.days
 import com.quarenta.calendario.ui.localTime
 import com.quarenta.calendario.ui.monthLong
-import com.quarenta.calendario.ui.startsIn
 import com.quarenta.calendario.ui.theme.Bento
-import com.quarenta.calendario.ui.timeRange
 import com.quarenta.calendario.ui.weekdayLong
-import java.time.Instant
 import java.time.LocalDate
 
 @Composable
@@ -68,16 +82,17 @@ fun HomeScreen(
     onOpenPerson: (Person) -> Unit = {},
     onOpenAppearance: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
+    photoFor: suspend (Person) -> Bitmap? = { null },
+    birthYearFor: suspend (Person) -> Int? = { null },
 ) {
     val today = LocalDate.now()
-    val now = Instant.now()
-    val todays = events.filter { today in it.days() }
-    val next = todays.firstOrNull { !it.allDay && it.end.isAfter(now) }
-        ?: events.firstOrNull { it.start.isAfter(now) }
-    val others = todays.filter { it != next && !it.allDay && it.end.isAfter(now) }.take(3)
-
-    val todayTasks = tasks.filter { it.dueEpochDay == today.toEpochDay() }
-    val doneToday = todayTasks.count { it.done }
+    val nowMs = System.currentTimeMillis()
+    val next = remember(events) {
+        Highlights.upcoming(events, nowMs, endMs = { it.end.toEpochMilli() }, startMs = { it.start.toEpochMilli() }, max = 1).firstOrNull()
+    }
+    val person = remember(next, people) {
+        next?.let { e -> PersonMatch.inTitle(e.title, people.map { it.id to it.name })?.let { id -> people.firstOrNull { it.id == id } } }
+    }
 
     Column(
         Modifier
@@ -116,121 +131,149 @@ fun HomeScreen(
 
         if (!hasCalendarAccess) AccessCard(onRequestAccess)
 
-        // Next event: the biggest tile.
-        BentoTile(Modifier.fillMaxWidth(), onClick = { if (next != null) onOpenEvent(next) else onOpenAgenda() }) {
-            if (next == null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    IconTile(Icons.Rounded.CalendarMonth, Bento.Blue, 48.dp, 26.dp)
-                    Text("Sem mais compromissos hoje", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    IconTile(Icons.Rounded.CalendarMonth, next.composeColor(), 48.dp, 26.dp)
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            listOfNotNull("Próximo", startsIn(next, now)).joinToString(" · "),
-                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Bento.BlueText,
-                        )
-                        Text(next.title, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f)) {
-                        Text(next.timeRange(), fontSize = 14.sp, color = Bento.Secondary)
-                        next.location?.let { Text(it, fontSize = 14.sp, color = Bento.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis) }
-                    }
-                    if (!next.allDay) {
-                        Text(next.start.localTime(), fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, color = next.composeColor(), letterSpacing = (-1.2).sp)
-                    }
-                }
-                if (others.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        others.forEach { e ->
-                            Text(
-                                "${e.start.localTime()} ${e.title}",
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(e.composeColor().copy(alpha = 0.14f))
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Bento.Ink,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        // Four big blocks, like Apple's widgets: the next event with the person's photo,
+        // the month, the favourites and the people.
+        NextBlock(next, person, photoFor, birthYearFor, today) { if (next != null) onOpenEvent(next) else onOpenAgenda() }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BentoTile(Modifier.weight(1f).height(170.dp), onClick = onOpenTasks) {
-                IconTile(Icons.Rounded.Check, Bento.Green)
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text("$doneToday", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(" / ${todayTasks.size}", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary, modifier = Modifier.padding(bottom = 6.dp))
-                }
-                Text("Tarefas feitas hoje", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Bento.Secondary)
-                Spacer(Modifier.weight(1f))
-                ProgressBar(if (todayTasks.isEmpty()) 0f else doneToday / todayTasks.size.toFloat(), Bento.Green)
-            }
-            BentoTile(Modifier.weight(1f).height(170.dp), onClick = onOpenAgenda) {
+            BentoTile(Modifier.weight(1f).aspectRatio(1f), onClick = onOpenAgenda) {
                 MiniMonth(today, events)
-            }
-        }
-
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BentoTile(Modifier.weight(1f).height(140.dp), onClick = onOpenBento) {
-                IconTile(Icons.Rounded.Groups, Bento.Orange)
-                Spacer(Modifier.weight(1f))
-                Text("Pessoas", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text("Fichas ao estilo Bento", fontSize = 12.sp, color = Bento.Secondary)
             }
             val favourites = people.filter { it.starred }
             // One favourite opens straight to their card; several open the Pessoas tab, where they sit on top.
             BentoTile(
-                Modifier.weight(1f).height(140.dp),
+                Modifier.weight(1f).aspectRatio(1f),
                 onClick = { favourites.singleOrNull()?.let(onOpenPerson) ?: onOpenBento() },
             ) {
-                if (favourites.isEmpty()) {
-                    IconTile(Icons.Rounded.Star, Bento.Yellow)
-                } else {
-                    Box(Modifier.height(44.dp)) {
-                        favourites.take(3).forEachIndexed { i, p ->
-                            Box(
-                                Modifier.padding(start = (i * 26).dp).size(44.dp).clip(CircleShape)
-                                    .background(Bento.Tile).padding(2.dp),
-                            ) { Avatar(p, 40.dp) }
+                Text("FAVORITOS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Orange, letterSpacing = 0.8.sp)
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    when (favourites.size) {
+                        0 -> IconTile(Icons.Rounded.Star, Bento.Yellow, 64.dp, 36.dp)
+                        1 -> Avatar(favourites.first(), 96.dp, full = true)
+                        else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            favourites.take(4).chunked(2).forEach { pair ->
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { pair.forEach { Avatar(it, 50.dp) } }
+                            }
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                Text("Favoritos", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    when (favourites.size) {
-                        0 -> "Toca na estrela numa ficha"
-                        1 -> favourites.first().name
-                        else -> "${favourites.size} pessoas"
-                    },
-                    fontSize = 12.sp, color = Bento.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
             }
         }
 
-        val pending = tasks.filter { !it.done && it.dueEpochDay != null && it.dueEpochDay <= today.toEpochDay() }
-        BentoTile(Modifier.fillMaxWidth(), color = Bento.Indigo, onClick = onOpenTasks) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                IconTile(Icons.Rounded.NotificationsActive, Color.White.copy(alpha = 0.22f))
-                Column {
-                    Text(
-                        if (pending.isEmpty()) "Nada pendente" else "${pending.size} por fazer hoje",
-                        fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White,
-                    )
-                    pending.firstOrNull()?.let {
-                        Text("Próximo: ${it.title}", fontSize = 13.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        BentoTile(Modifier.fillMaxWidth().height(116.dp), onClick = onOpenBento) {
+            Text("PESSOAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.BlueText, letterSpacing = 0.8.sp)
+            Spacer(Modifier.weight(1f))
+            if (people.isEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconTile(Icons.Rounded.Groups, Bento.Orange)
+                    Text("Fichas de quem é importante", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                // A row of faces, the starred ones first.
+                val faces = people.sortedByDescending { it.starred }.take(6)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f).height(52.dp)) {
+                        faces.forEachIndexed { i, p ->
+                            Box(
+                                Modifier.padding(start = (i * 38).dp).size(52.dp).clip(CircleShape)
+                                    .background(Bento.Tile).padding(2.dp),
+                            ) { Avatar(p, 48.dp) }
+                        }
                     }
+                    Text("${people.size}", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+                }
+            }
+        }
+    }
+}
+
+/** The next thing on the calendar, as one big card: the person's photo at full resolution when there is one. */
+@Composable
+private fun NextBlock(
+    next: CalendarEvent?,
+    person: Person?,
+    photoFor: suspend (Person) -> Bitmap?,
+    birthYearFor: suspend (Person) -> Int?,
+    today: LocalDate,
+    onOpen: () -> Unit,
+) {
+    val color = next?.composeColor() ?: Bento.Blue
+    val photo by produceState<Bitmap?>(null, person?.id) { value = person?.let { photoFor(it) } }
+    val birthday = next != null && Highlights.isBirthday(next.title, next.sources)
+    val birthYear by produceState<Int?>(null, person?.id, birthday) {
+        value = if (birthday && person != null) birthYearFor(person) else null
+    }
+    Box(
+        Modifier.fillMaxWidth().aspectRatio(1.05f).clip(RoundedCornerShape(30.dp)).clickable(onClick = onOpen),
+    ) {
+        val bitmap = photo
+        if (bitmap != null) {
+            Image(
+                bitmap.asImageBitmap(), contentDescription = person?.name,
+                contentScale = ContentScale.Crop, filterQuality = FilterQuality.High,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.linearGradient(listOf(lerp(color, Color.White, 0.25f), color, lerp(color, Color.Black, 0.45f))),
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                val initials = person?.name?.let(ContactFormat::initials).orEmpty()
+                Box(
+                    Modifier.padding(bottom = 70.dp).size(120.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (initials.isNotEmpty()) {
+                        Text(initials, color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold)
+                    } else {
+                        Icon(
+                            if (birthday) Icons.Rounded.Cake else Icons.Rounded.CalendarMonth,
+                            contentDescription = null, tint = Color.White, modifier = Modifier.size(60.dp),
+                        )
+                    }
+                }
+            }
+        }
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f)),
+            ),
+        )
+        Column(
+            Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            if (next == null) {
+                Text("Sem compromissos", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Toca para abrir a agenda", color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                val day = next.start.localDate()
+                val whenText = (Highlights.shortDay(day, today) +
+                    (if (next.allDay) "" else " · ${next.start.localTime()}")).replaceFirstChar { it.uppercase() }
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        if (birthday) {
+                            Text(
+                                Highlights.birthdayLabel(birthYear, day, today).replaceFirstChar { it.uppercase() },
+                                color = Color.White, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.ExtraBold,
+                            )
+                        } else {
+                            Text(
+                                if (bitmap != null) withoutName(next.title, person) else next.title,
+                                color = Color.White, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.ExtraBold,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(whenText, color = Color.White.copy(alpha = 0.9f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Abrir", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.24f))
+                            .clickable(onClick = onOpen).padding(horizontal = 18.dp, vertical = 7.dp),
+                    )
                 }
             }
         }
@@ -250,10 +293,10 @@ private fun MiniMonth(today: LocalDate, events: List<CalendarEvent>) {
         Row(Modifier.padding(top = 1.dp)) {
             for (i in 0 until 7) {
                 val d = week.getOrNull(i)
-                Box(Modifier.weight(1f).height(15.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.weight(1f).height(14.dp), contentAlignment = Alignment.Center) {
                     if (d != null) {
                         if (d == today) {
-                            Box(Modifier.size(15.dp).clip(CircleShape).background(Bento.Red), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(14.dp).clip(CircleShape).background(Bento.Red), contentAlignment = Alignment.Center) {
                                 Text("${d.dayOfMonth}", fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                             }
                         } else {

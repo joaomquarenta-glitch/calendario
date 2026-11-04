@@ -211,7 +211,7 @@ private fun HighlightCard(
 }
 
 /** "Jantar com Ana Sousa" with Ana's photo becomes "Jantar com"... so drop a trailing "com"/"-" as well. */
-private fun withoutName(title: String, person: Person?): String {
+internal fun withoutName(title: String, person: Person?): String {
     if (person == null) return title
     val words = person.name.trim().split(Regex("\\s+"))
     var t = title
