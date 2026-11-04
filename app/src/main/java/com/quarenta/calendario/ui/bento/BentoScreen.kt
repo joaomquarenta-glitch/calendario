@@ -1,6 +1,13 @@
 package com.quarenta.calendario.ui.bento
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.remember
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -107,8 +114,14 @@ fun BentoScreen(
     hasContactsAccess: Boolean,
     onRequestAccess: () -> Unit,
     onOpenPerson: (Person) -> Unit,
+    onDeletePerson: (Person) -> Unit = {},
 ) {
     var query by rememberSaveable { mutableStateOf("") }
+    // Press and hold a person to delete them; Android asks first.
+    var toDelete by remember { mutableStateOf<Person?>(null) }
+    toDelete?.let { p ->
+        DeletePersonDialog(p, onConfirm = { toDelete = null; onDeletePerson(p) }, onDismiss = { toDelete = null })
+    }
     val q = Dedup.normalize(query)
     val filtered = if (q.isBlank()) people else people.filter { Dedup.normalize(it.name).contains(q) }
     val favourites = filtered.filter { it.starred }
@@ -159,7 +172,7 @@ fun BentoScreen(
         }
         if (favourites.isNotEmpty() && q.isBlank()) {
             item(span = { GridItemSpan(maxLineSpan) }) { Label("FAVORITOS") }
-            items(favourites, key = { "f${it.id}" }) { person -> PhotoTile(person) { onOpenPerson(person) } }
+            items(favourites, key = { "f${it.id}" }) { person -> PhotoTile(person, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
             item(span = { GridItemSpan(maxLineSpan) }) { Label("TODOS") }
         } else if (q.isBlank() && filtered.isNotEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -169,7 +182,7 @@ fun BentoScreen(
                 )
             }
         }
-        items(filtered, key = { it.id }) { person -> PersonTile(person) { onOpenPerson(person) } }
+        items(filtered, key = { it.id }) { person -> PersonTile(person, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
         if (filtered.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Text("Nenhuma pessoa encontrada.", color = Bento.Secondary, modifier = Modifier.padding(8.dp))
@@ -185,11 +198,11 @@ private fun Label(text: String) {
 
 /** Favourites: the photo fills the whole tile. */
 @Composable
-private fun PhotoTile(person: Person, onClick: () -> Unit) {
+private fun PhotoTile(person: Person, onLongClick: () -> Unit, onClick: () -> Unit) {
     val photo = rememberContactPhoto(person, full = true)
     Box(
         Modifier.fillMaxWidth().aspectRatio(0.8f).clip(RoundedCornerShape(22.dp))
-            .background(avatarColor(person.name)).clickable(onClick = onClick),
+            .background(avatarColor(person.name)).holdable(onClick, onLongClick),
     ) {
         if (photo != null) {
             Image(photo, contentDescription = null, contentScale = ContentScale.Crop, filterQuality = FilterQuality.High, modifier = Modifier.fillMaxSize())
@@ -206,13 +219,49 @@ private fun PhotoTile(person: Person, onClick: () -> Unit) {
 }
 
 @Composable
-private fun PersonTile(person: Person, onClick: () -> Unit) {
+private fun PersonTile(person: Person, onLongClick: () -> Unit, onClick: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Bento.Tile).clickable(onClick = onClick).padding(vertical = 14.dp, horizontal = 6.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Bento.Tile).holdable(onClick, onLongClick).padding(vertical = 14.dp, horizontal = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Avatar(person, 64.dp)
         Text(person.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, textAlign = TextAlign.Center, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp)
     }
+}
+
+/** Tap opens; press and hold offers to delete, with a little vibration like on the iPhone. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.holdable(onClick: () -> Unit, onLongClick: () -> Unit): Modifier {
+    val haptics = LocalHapticFeedback.current
+    return combinedClickable(
+        onClick = onClick,
+        onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() },
+    )
+}
+
+@Composable
+private fun DeletePersonDialog(person: Person, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Avatar(person, 72.dp) },
+        title = { Text("Apagar ${person.name}?", textAlign = TextAlign.Center) },
+        text = {
+            Text(
+                "O contacto é apagado do telemóvel e das contas onde está guardado (Google, Samsung...). Não dá para desfazer.",
+                textAlign = TextAlign.Center,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Apagar", color = Bento.RedText, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar", fontWeight = FontWeight.SemiBold) }
+        },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = Bento.Tile,
+        titleContentColor = Bento.Ink,
+        textContentColor = Bento.Secondary,
+    )
 }

@@ -305,6 +305,16 @@ class ContactsRepository(private val context: Context) {
         return resolver.update(ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id), values, null, null) > 0
     }
 
+    /**
+     * Deletes the contact from the phone. Android also removes it from the accounts it syncs with
+     * (Google, Samsung...), the same as deleting it in the phone's Contacts app.
+     */
+    fun delete(person: Person): Boolean = runCatching {
+        val uri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_LOOKUP_URI, person.lookupKey)
+        resolver.delete(uri, null, null) > 0 ||
+            resolver.delete(ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id), null, null) > 0
+    }.getOrDefault(false)
+
     /** The largest photo the phone has for this person (full-size when synced, not the thumbnail). */
     fun photo(person: Person): Bitmap? = runCatching {
         val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id)
