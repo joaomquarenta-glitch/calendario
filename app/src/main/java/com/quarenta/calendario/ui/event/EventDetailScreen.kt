@@ -109,6 +109,7 @@ fun EventDetailScreen(
 
     Column(Modifier.fillMaxSize().background(Bento.Ground)) {
         val bitmap = photo
+        com.quarenta.calendario.ui.components.HdrWhile(com.quarenta.calendario.ui.components.isHdr(bitmap))
         if (bitmap != null) {
             // Top half: the photo, fixed; nothing is drawn over the face except the buttons.
             Box(Modifier.weight(1f).fillMaxWidth()) {

@@ -82,6 +82,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -155,6 +156,7 @@ fun PersonScreen(
     val scope = rememberCoroutineScope()
     val repo = remember { ContactsRepository(context) }
     val photo = rememberContactPhoto(person, full = true)
+    com.quarenta.calendario.ui.components.HdrWhile(com.quarenta.calendario.ui.components.isHdr(photo?.asAndroidBitmap()))
     // A high-resolution photo chosen in this app, and when it was taken (for the "more than a year" warning).
     val photoVersion by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
     val chosenPhotoDate by produceState<LocalDate?>(null, person.id, photoVersion) {
