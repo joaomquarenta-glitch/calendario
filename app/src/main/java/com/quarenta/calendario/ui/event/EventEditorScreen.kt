@@ -51,11 +51,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quarenta.calendario.data.CalendarInfo
 import com.quarenta.calendario.data.EventDraft
+import com.quarenta.calendario.data.QuickAdd
 import com.quarenta.calendario.ui.dayHeading
 import com.quarenta.calendario.ui.theme.Bento
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -126,6 +128,41 @@ fun EventEditorScreen(
                     modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Bento.Blue.copy(alpha = 0.12f)).padding(14.dp),
                     color = Bento.BlueText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
                 )
+            }
+
+            if (isNew && !fromOtherApp) {
+                // Write it the way you'd say it; the title, day and time below fill themselves in.
+                var quick by remember { mutableStateOf("") }
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Bento.Blue.copy(alpha = 0.10f)).padding(top = 12.dp)) {
+                    Text(
+                        "ESCREVE COMO DIRIAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.BlueText,
+                        letterSpacing = 0.6.sp, modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    TextField(
+                        value = quick,
+                        onValueChange = { text ->
+                            quick = text
+                            val r = QuickAdd.parse(text, LocalDateTime.now(zone))
+                            draft = when {
+                                !r.foundWhen -> draft.copy(title = r.title, start = initial.start, end = initial.end, allDay = initial.allDay)
+                                r.allDay -> {
+                                    val day = r.date.atStartOfDay(zone).toInstant()
+                                    draft.copy(title = r.title, allDay = true, start = day, end = r.date.plusDays(1).atStartOfDay(zone).toInstant())
+                                }
+                                else -> {
+                                    val begin = r.date.atTime(r.start ?: startTime).atZone(zone).toInstant()
+                                    val finish = r.end?.let { r.date.atTime(it).atZone(zone).toInstant() } ?: begin.plusSeconds(3600)
+                                    draft.copy(title = r.title, allDay = false, start = begin, end = finish)
+                                }
+                            }
+                        },
+                        placeholder = { Text("Jantar com a Ana sexta 20h") },
+                        singleLine = true,
+                        colors = transparentFieldColors(),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
             Card {
