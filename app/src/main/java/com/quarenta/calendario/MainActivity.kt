@@ -138,6 +138,7 @@ private fun App(vm: AppViewModel) {
     val hasAccess by vm.hasCalendarAccess.collectAsStateWithLifecycle()
     val hasContacts by vm.hasContactsAccess.collectAsStateWithLifecycle()
     val people by vm.people.collectAsStateWithLifecycle()
+    val birthdays by vm.birthdays.collectAsStateWithLifecycle()
     val selectedDate by vm.selectedDate.collectAsStateWithLifecycle()
     val overlay by vm.overlay.collectAsStateWithLifecycle()
     val writable by vm.writableCalendars.collectAsStateWithLifecycle()
@@ -263,6 +264,8 @@ private fun App(vm: AppViewModel) {
                         onOpenAppearance = vm::openAppearance,
                         onOpenReminders = vm::openReminders,
                         onOpenCalendars = vm::openCalendars,
+                        birthdays = birthdays,
+                        onOpenBirthdays = vm::openBirthdays,
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
                     )
@@ -343,6 +346,7 @@ private fun App(vm: AppViewModel) {
                     birthYearFor = vm::birthYearFor,
                     plan = plan,
                     onSavePlan = vm::savePlan,
+                    phoneFor = vm::phoneFor,
                 )
             }
             is Overlay.Editor -> EventEditorScreen(
@@ -377,6 +381,10 @@ private fun App(vm: AppViewModel) {
                 pool = vm::searchPool,
                 onOpenEvent = vm::openEvent,
                 onClose = vm::closeOverlay,
+            )
+            Overlay.Birthdays -> com.quarenta.calendario.ui.home.BirthdaysScreen(
+                entries = birthdays, people = people,
+                onOpenPerson = vm::openPerson, onClose = vm::closeOverlay,
             )
             Overlay.Reminders -> RemindersScreen(onClose = vm::closeOverlay, sample = vm::sampleReminder)
             is Overlay.PersonCard -> {

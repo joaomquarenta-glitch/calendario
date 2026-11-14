@@ -85,6 +85,8 @@ fun HomeScreen(
     onOpenAppearance: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
     onOpenCalendars: () -> Unit = {},
+    birthdays: List<com.quarenta.calendario.data.Birthdays.Entry> = emptyList(),
+    onOpenBirthdays: () -> Unit = {},
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
 ) {
@@ -172,6 +174,8 @@ fun HomeScreen(
                 }
             }
         }
+
+        BirthdaysTile(birthdays, people, onOpenBirthdays)
 
         BentoTile(Modifier.fillMaxWidth().height(116.dp), onClick = onOpenBento) {
             Text("PESSOAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.BlueText, letterSpacing = 0.8.sp)
