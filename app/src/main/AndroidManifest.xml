@@ -114,6 +114,11 @@
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />
 
+        <!-- The morning summary of the day ahead -->
+        <receiver
+            android:name=".reminders.MorningReceiver"
+            android:exported="false" />
+
         <!-- Phone events that can move reminders; this one only recomputes the next alarm -->
         <receiver
             android:name=".reminders.ReminderSystemReceiver"
