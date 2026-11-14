@@ -337,7 +337,7 @@ private fun App(vm: AppViewModel) {
                     event = o.event,
                     onClose = vm::closeOverlay,
                     onEdit = { vm.editEvent(o.event) },
-                    onDelete = { vm.delete(o.event) },
+                    onDelete = { onlyThis -> vm.delete(o.event, onlyThis) },
                     person = person,
                     photoFor = vm::photoFor,
                     birthYearFor = vm::birthYearFor,
@@ -352,6 +352,7 @@ private fun App(vm: AppViewModel) {
                 calendars = writable,
                 onCancel = vm::closeOverlay,
                 onSave = { draft -> vm.save(draft, o.editingId) },
+                existingRepeat = o.event?.let { com.quarenta.calendario.data.Repeat.of(it.rrule) },
             )
             Overlay.Appearance -> AppearanceScreen(
                 selectedId = ThemeState.selectedId,

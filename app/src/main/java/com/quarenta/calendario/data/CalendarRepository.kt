@@ -27,7 +27,13 @@ data class CalendarEvent(
     val sources: List<String> = listOf(calendarName),
     /** Ids of the other copies merged into this one. */
     val duplicateIds: List<Long> = emptyList(),
-)
+    /** The series' repeat rule, or null for a one-off appointment. */
+    val rrule: String? = null,
+    /** This occurrence's start exactly as the calendar store keeps it (needed to change only this one). */
+    val instanceBegin: Long = start.toEpochMilli(),
+) {
+    val repeats: Boolean get() = !rrule.isNullOrBlank()
+}
 
 data class CalendarInfo(val id: Long, val name: String, val account: String, val color: Int, val isPrimary: Boolean)
 
@@ -41,6 +47,10 @@ data class EventDraft(
     val description: String = "",
     val calendarId: Long? = null,
     val reminderMinutes: Int? = 30,
+    /** How it repeats; null keeps what an edited event already has. */
+    val repeat: Repeat? = null,
+    /** For a repeating event: change only this occurrence, or all of them. */
+    val scope: EditScope = EditScope.All,
 )
 
 /**
@@ -74,6 +84,7 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
             CalendarContract.Instances.OWNER_ACCOUNT,
             CalendarContract.Instances.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Instances.RRULE,
         )
 
         val events = mutableListOf<CalendarEvent>()
@@ -100,6 +111,8 @@ class CalendarRepository(private val context: Context) {
                     calendarName = c.getString(9) ?: "",
                     accountName = c.getString(10) ?: "",
                     canEdit = c.getInt(11) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                    rrule = c.getString(12)?.takeIf { it.isNotBlank() },
+                    instanceBegin = c.getLong(2),
                 )
             }
         }
@@ -122,6 +135,7 @@ class CalendarRepository(private val context: Context) {
             CalendarContract.Events.OWNER_ACCOUNT,
             CalendarContract.Events.CALENDAR_ACCESS_LEVEL,
             CalendarContract.Events.DURATION,
+            CalendarContract.Events.RRULE,
         )
         val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, id)
         return resolver.query(uri, projection, null, null, null)?.use { c ->
@@ -142,6 +156,8 @@ class CalendarRepository(private val context: Context) {
                 calendarName = c.getString(9) ?: "",
                 accountName = c.getString(10) ?: "",
                 canEdit = c.getInt(11) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                rrule = c.getString(13)?.takeIf { it.isNotBlank() },
+                instanceBegin = startMs,
             )
         }
     }
@@ -206,6 +222,7 @@ class CalendarRepository(private val context: Context) {
     fun insert(draft: EventDraft, zone: ZoneId = ZoneId.systemDefault()): Long? {
         val calendarId = draft.calendarId ?: writableCalendars().firstOrNull()?.id ?: return null
         val values = draft.toValues(zone).apply { put(CalendarContract.Events.CALENDAR_ID, calendarId) }
+        Repeat.rrule(draft.repeat ?: Repeat.None, draft.start.atZone(zone).toLocalDate())?.let { rule -> makeRepeating(values, rule, draft.allDay) }
         val uri = resolver.insert(CalendarContract.Events.CONTENT_URI, values) ?: return null
         val id = ContentUris.parseId(uri)
         draft.reminderMinutes?.let { minutes ->
@@ -228,7 +245,13 @@ class CalendarRepository(private val context: Context) {
      *  - Moving to another calendar is a copy into the new one and a delete from the old one,
      *    which every calendar account accepts.
      */
-    fun update(eventId: Long, draft: EventDraft, originalStart: Instant? = null, zone: ZoneId = ZoneId.systemDefault()): UpdateResult {
+    fun update(
+        eventId: Long,
+        draft: EventDraft,
+        originalStart: Instant? = null,
+        zone: ZoneId = ZoneId.systemDefault(),
+        instanceBegin: Long? = null,
+    ): UpdateResult {
         val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
         val current = resolver.query(
             uri,
@@ -242,7 +265,25 @@ class CalendarRepository(private val context: Context) {
         if (current.accessLevel < CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR) return UpdateResult.ReadOnly
 
         val values = draft.toValues(zone)
-        if (!current.rrule.isNullOrBlank()) {
+        val hadRule = !current.rrule.isNullOrBlank()
+
+        // Only this occurrence: Android keeps it as an exception to the series.
+        if (hadRule && draft.scope == EditScope.ThisOne && instanceBegin != null) {
+            values.put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, instanceBegin)
+            val exceptionUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, eventId)
+            return if (resolver.insert(exceptionUri, values) != null) UpdateResult.Saved else UpdateResult.Failed
+        }
+
+        val newRule = draft.repeat?.let { Repeat.rrule(it, draft.start.atZone(zone).toLocalDate(), current.rrule) } ?: current.rrule
+        if (newRule.isNullOrBlank()) {
+            if (hadRule) {
+                // It stops repeating: one appointment at the edited date.
+                values.putNull(CalendarContract.Events.RRULE)
+                values.putNull(CalendarContract.Events.DURATION)
+            }
+        } else if (!hadRule) {
+            makeRepeating(values, newRule, draft.allDay)
+        } else {
             val start = values.getAsLong(CalendarContract.Events.DTSTART)
             val end = values.getAsLong(CalendarContract.Events.DTEND)
             values.remove(CalendarContract.Events.DTEND)
@@ -250,7 +291,7 @@ class CalendarRepository(private val context: Context) {
             values.put(CalendarContract.Events.DURATION, EventRules.duration(end - start, draft.allDay))
             val shift = originalStart?.let { draft.start.toEpochMilli() - it.toEpochMilli() } ?: 0L
             values.put(CalendarContract.Events.DTSTART, EventRules.seriesStart(current.dtStart, shift, draft.allDay))
-            values.put(CalendarContract.Events.RRULE, current.rrule)
+            values.put(CalendarContract.Events.RRULE, newRule)
         }
 
         val target = draft.calendarId
@@ -282,9 +323,28 @@ class CalendarRepository(private val context: Context) {
         }
     }
 
-    fun delete(eventId: Long): Boolean {
+    /** Deletes the appointment, or with [onlyInstance] just that occurrence of a repeating one. */
+    fun delete(eventId: Long, onlyInstance: Long? = null): Boolean {
+        if (onlyInstance != null) {
+            val values = ContentValues().apply {
+                put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, onlyInstance)
+                put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CANCELED)
+            }
+            val exceptionUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, eventId)
+            return resolver.insert(exceptionUri, values) != null
+        }
         val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
         return resolver.delete(uri, null, null) > 0
+    }
+
+    /** Android stores repeating events with a length instead of an end. */
+    private fun makeRepeating(values: ContentValues, rule: String, allDay: Boolean) {
+        val start = values.getAsLong(CalendarContract.Events.DTSTART)
+        val end = values.getAsLong(CalendarContract.Events.DTEND)
+        values.remove(CalendarContract.Events.DTEND)
+        values.putNull(CalendarContract.Events.DTEND)
+        values.put(CalendarContract.Events.DURATION, EventRules.duration(end - start, allDay))
+        values.put(CalendarContract.Events.RRULE, rule)
     }
 
     private fun EventDraft.toValues(zone: ZoneId) = ContentValues().apply {

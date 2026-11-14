@@ -50,7 +50,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quarenta.calendario.data.CalendarInfo
+import com.quarenta.calendario.data.EditScope
 import com.quarenta.calendario.data.EventDraft
+import com.quarenta.calendario.data.Repeat
 import com.quarenta.calendario.data.QuickAdd
 import com.quarenta.calendario.ui.dayHeading
 import com.quarenta.calendario.ui.theme.Bento
@@ -74,6 +76,8 @@ fun EventEditorScreen(
     calendars: List<CalendarInfo>,
     onCancel: () -> Unit,
     onSave: (EventDraft) -> Unit,
+    /** How the edited appointment repeats now; null for a new one. */
+    existingRepeat: Repeat? = null,
 ) {
     BackHandler(onBack = onCancel)
     val zone = ZoneId.systemDefault()
@@ -184,6 +188,23 @@ fun EventEditorScreen(
                 DateTimeRow("Início", startDate, startTime, draft.allDay, { picking = Picking.StartDate }, { picking = Picking.StartTime })
                 HorizontalDivider(color = Bento.Hairline)
                 DateTimeRow("Fim", endDate, endTime, draft.allDay, { picking = Picking.EndDate }, { picking = Picking.EndTime })
+            }
+
+            val baseRepeat = existingRepeat ?: Repeat.None
+            if (existingRepeat != null && existingRepeat != Repeat.None) {
+                Label("ALTERAR")
+                Chips(
+                    options = listOf(EditScope.ThisOne to "Só este dia", EditScope.All to "Todos os dias da série"),
+                    selected = draft.scope,
+                ) { draft = draft.copy(scope = it, repeat = if (it == EditScope.ThisOne) null else draft.repeat) }
+            }
+            if (draft.scope == EditScope.All) {
+                Label("REPETIR")
+                val options = Repeat.choices + if (baseRepeat == Repeat.Custom) listOf(Repeat.Custom) else emptyList()
+                Chips(
+                    options = options.map { it to it.label },
+                    selected = draft.repeat ?: baseRepeat,
+                ) { picked -> draft = draft.copy(repeat = if (existingRepeat != null && picked == baseRepeat) null else picked) }
             }
 
             Label("AVISO")
