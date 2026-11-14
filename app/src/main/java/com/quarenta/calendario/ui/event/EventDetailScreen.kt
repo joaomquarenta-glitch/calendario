@@ -87,7 +87,8 @@ fun EventDetailScreen(
     event: CalendarEvent,
     onClose: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
+    /** true deletes only this occurrence of a repeating appointment. */
+    onDelete: (onlyThis: Boolean) -> Unit,
     person: Person? = null,
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
@@ -199,8 +200,22 @@ fun EventDetailScreen(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Apagar \"${event.title}\"?") },
-            text = { Text("O compromisso é apagado deste calendário em todos os teus dispositivos.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text("Apagar", color = Bento.RedText) } },
+            text = {
+                Text(
+                    if (event.repeats) "Este compromisso repete-se. Apagas só este dia ou todos?"
+                    else "O compromisso é apagado deste calendário em todos os teus dispositivos.",
+                )
+            },
+            confirmButton = {
+                if (event.repeats) {
+                    Row {
+                        TextButton(onClick = { confirmDelete = false; onDelete(true) }) { Text("Só este", color = Bento.RedText) }
+                        TextButton(onClick = { confirmDelete = false; onDelete(false) }) { Text("Todos", color = Bento.RedText) }
+                    }
+                } else {
+                    TextButton(onClick = { confirmDelete = false; onDelete(false) }) { Text("Apagar", color = Bento.RedText) }
+                }
+            },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } },
         )
     }

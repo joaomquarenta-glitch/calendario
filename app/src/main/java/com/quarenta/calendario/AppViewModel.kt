@@ -49,7 +49,13 @@ import java.time.temporal.TemporalAdjusters
 sealed interface Overlay {
     data class Detail(val event: CalendarEvent) : Overlay
     /** [editingId] is null for a new event. */
-    data class Editor(val draft: EventDraft, val editingId: Long? = null, val fromOtherApp: Boolean = false) : Overlay
+    data class Editor(
+        val draft: EventDraft,
+        val editingId: Long? = null,
+        val fromOtherApp: Boolean = false,
+        /** The occurrence being edited, so a repeating one can change alone. */
+        val event: CalendarEvent? = null,
+    ) : Overlay
     data class PersonCard(val person: Person) : Overlay
     data object Appearance : Overlay
     data object Reminders : Overlay
@@ -488,6 +494,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 calendarId = event.calendarId, reminderMinutes = null,
             ),
             editingId = event.id,
+            event = event,
         ))
     }
 
@@ -496,13 +503,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun save(draft: EventDraft, editingId: Long?) {
         viewModelScope.launch {
             // Where the occurrence was before editing, so a repeating event moves by the same amount.
-            val originalStart = (stack.lastOrNull { it is Overlay.Editor } as? Overlay.Editor)?.draft?.start
+            val editor = stack.lastOrNull { it is Overlay.Editor } as? Overlay.Editor
+            val originalStart = editor?.draft?.start
+            val instanceBegin = editor?.event?.instanceBegin
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     if (editingId == null) {
                         if (calendars.insert(draft) != null) CalendarRepository.UpdateResult.Saved else CalendarRepository.UpdateResult.Failed
                     } else {
-                        calendars.update(editingId, draft, originalStart)
+                        calendars.update(editingId, draft, originalStart, instanceBegin = instanceBegin)
                     }
                 }.getOrDefault(CalendarRepository.UpdateResult.Failed)
             }
@@ -523,9 +532,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun delete(event: CalendarEvent) {
+    fun delete(event: CalendarEvent, onlyThis: Boolean = false) {
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { runCatching { calendars.delete(event.id) }.getOrDefault(false) }
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { calendars.delete(event.id, if (onlyThis && event.repeats) event.instanceBegin else null) }.getOrDefault(false)
+            }
             _message.value = if (ok) "Compromisso apagado" else "Este calendário não permite apagar"
             if (ok) { if (stack.lastOrNull() is Overlay.Detail) pop(); refresh() }
         }
