@@ -358,11 +358,16 @@ private fun App(vm: AppViewModel) {
                 onSelect = vm::setTheme,
                 onClose = vm::closeOverlay,
             )
-            Overlay.Calendars -> {
+            is Overlay.Calendars -> {
                 val hidden by vm.hiddenCalendars.collectAsStateWithLifecycle()
+                val subs by vm.subscriptions.collectAsStateWithLifecycle()
                 com.quarenta.calendario.ui.settings.CalendarsScreen(
                     load = vm::allCalendars,
                     hidden = hidden.orEmpty(),
+                    subscriptions = subs.orEmpty(),
+                    prefillUrl = o.prefillUrl,
+                    onSubscribe = vm::addSubscription,
+                    onUnsubscribe = vm::removeSubscription,
                     onShown = vm::setCalendarShown,
                     onClose = vm::closeOverlay,
                 )

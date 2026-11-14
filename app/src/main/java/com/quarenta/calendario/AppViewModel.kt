@@ -56,7 +56,7 @@ sealed interface Overlay {
     /** A picture shared from another app (Instagram, WhatsApp, Galeria...): whose photo is it? */
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
     data object Search : Overlay
-    data object Calendars : Overlay
+    data class Calendars(val prefillUrl: String? = null) : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -162,6 +162,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _refreshing.value = true
         refresh()
         refreshPeople()
+        syncSubscriptions(force = true)
         viewModelScope.launch {
             val found = withContext(Dispatchers.IO) { Updater.check(BuildConfig.VERSION_NAME) }
             lastUpdateCheck = System.currentTimeMillis()
@@ -176,6 +177,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refresh()
         refreshPeople()
         checkForUpdate()
+        syncSubscriptions(force = false)
     }
 
     fun onPermissionResult() {
@@ -405,7 +407,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Which calendars this app shows -------------------------------------------------
 
-    fun openCalendars() = push(Overlay.Calendars)
+    fun openCalendars() = push(Overlay.Calendars())
+
+    // ---- Subscribed links (webcal / .ics / iCloud) ---------------------------------------
+
+    val subscriptions = com.quarenta.calendario.data.Subscriptions.observe(app)
+
+    /** Returns an error to show, or null when the link was added. */
+    suspend fun addSubscription(url: String, name: String, color: Int): String? {
+        val app = getApplication<Application>()
+        val error = withContext(Dispatchers.IO) { com.quarenta.calendario.data.Subscriptions.add(app, url, name, color) }
+        if (error == null) afterSubscriptionsChanged()
+        return error
+    }
+
+    fun removeSubscription(sub: com.quarenta.calendario.data.Subscription) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { com.quarenta.calendario.data.Subscriptions.remove(app, sub) }
+            afterSubscriptionsChanged()
+        }
+    }
+
+    private fun syncSubscriptions(force: Boolean) {
+        val app = getApplication<Application>()
+        if (!checkAccess() || com.quarenta.calendario.data.Subscriptions.all(app).isEmpty()) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { com.quarenta.calendario.data.Subscriptions.syncDue(app, if (force) 0L else 6 * 3600_000L) }
+            }
+            afterSubscriptionsChanged()
+        }
+    }
+
+    private fun afterSubscriptionsChanged() {
+        val app = getApplication<Application>()
+        runCatching { com.quarenta.calendario.data.SubscriptionJob.schedule(app) }
+        loadedRange = LocalDate.MIN..LocalDate.MIN
+        refresh()
+        com.quarenta.calendario.widget.NextWidget.refresh(app)
+    }
 
     suspend fun allCalendars(): List<com.quarenta.calendario.data.CalendarInfo> = withContext(Dispatchers.IO) {
         if (!checkAccess()) emptyList() else runCatching { calendars.allCalendars() }.getOrDefault(emptyList())
@@ -494,6 +535,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Handles "Add to calendar" buttons and .ics files sent by other apps. */
     fun handleIntent(intent: Intent?) {
+        val scheme = intent?.data?.scheme?.lowercase()
+        if (intent?.action == Intent.ACTION_VIEW && (scheme == "webcal" || scheme == "webcals")) {
+            replaceAll(Overlay.Calendars(prefillUrl = intent.data.toString()))
+            return
+        }
         if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
             @Suppress("DEPRECATION")
             val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)

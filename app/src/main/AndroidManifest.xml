@@ -90,6 +90,14 @@
                 <data android:host="www.google.com" />
                 <data android:pathPrefix="/calendar" />
             </intent-filter>
+            <!-- "Subscribe" links on websites (school, club, iCloud shared calendars) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="webcal" />
+                <data android:scheme="webcals" />
+            </intent-filter>
         </activity>
         <activity
             android:name=".reminders.ReminderActivity"
@@ -137,6 +145,12 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_next_info" />
         </receiver>
+
+        <!-- Refreshes subscribed calendar links in the background -->
+        <service
+            android:name=".data.SubscriptionJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
