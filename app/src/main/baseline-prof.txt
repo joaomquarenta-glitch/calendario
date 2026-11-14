@@ -1,0 +1,5 @@
+# Startup and scrolling profile for FortyCalendar's own code. Android compiles these methods ahead
+# of time at install, so the first screens open fast and lists scroll without stutter.
+# (Compose and the other libraries ship their own profiles; profileinstaller applies them all.)
+HSPLcom/quarenta/calendario/**->**(**)**
+Lcom/quarenta/calendario/**;

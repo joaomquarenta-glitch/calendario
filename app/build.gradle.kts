@@ -42,7 +42,11 @@ android {
         debug {
             if (keystorePassword != null) signingConfig = signingConfigs.getByName("forty")
         }
+        // The APK people install. Unlike debug it is not "debuggable", so Android compiles it fully
+        // and Compose runs smoothly at 90/120 Hz. Same key as before, so it installs over the old one.
         release {
+            signingConfig = if (keystorePassword != null) signingConfigs.getByName("forty") else signingConfigs.getByName("debug")
+            // No code shrinking yet: everything stays exactly as tested.
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
@@ -68,6 +72,8 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.activity:activity-compose:1.9.3")
+    // Installs the ready-made speed profiles of Compose (and our own) when the APK is installed from outside the Play Store
+    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
