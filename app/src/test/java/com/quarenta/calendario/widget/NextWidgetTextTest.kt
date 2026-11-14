@@ -31,4 +31,11 @@ class NextWidgetTextTest {
         assertEquals("Dentista", l.headline)
         assertEquals("Amanhã · 09:00", l.subline)
     }
+
+    @Test fun largeWidgetRows() {
+        val today = java.time.LocalDate.of(2030, 3, 10)
+        assertEquals("Amanhã 20:00 · Jantar", NextWidgetText.row("Jantar", today.plusDays(1), today, "20:00"))
+        assertEquals("Hoje · Feriado", NextWidgetText.row("Feriado", today, today, null))
+        assertEquals("Dia 14 09:30 · Dentista", NextWidgetText.row("Dentista", today.plusDays(4), today, "09:30"))
+    }
 }
