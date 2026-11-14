@@ -262,6 +262,7 @@ private fun App(vm: AppViewModel) {
                         onOpenPerson = vm::openPerson,
                         onOpenAppearance = vm::openAppearance,
                         onOpenReminders = vm::openReminders,
+                        onOpenCalendars = vm::openCalendars,
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
                     )
@@ -357,6 +358,15 @@ private fun App(vm: AppViewModel) {
                 onSelect = vm::setTheme,
                 onClose = vm::closeOverlay,
             )
+            Overlay.Calendars -> {
+                val hidden by vm.hiddenCalendars.collectAsStateWithLifecycle()
+                com.quarenta.calendario.ui.settings.CalendarsScreen(
+                    load = vm::allCalendars,
+                    hidden = hidden.orEmpty(),
+                    onShown = vm::setCalendarShown,
+                    onClose = vm::closeOverlay,
+                )
+            }
             Overlay.Search -> com.quarenta.calendario.ui.agenda.SearchScreen(
                 pool = vm::searchPool,
                 onOpenEvent = vm::openEvent,

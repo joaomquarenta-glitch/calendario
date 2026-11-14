@@ -83,6 +83,7 @@ fun HomeScreen(
     onOpenPerson: (Person) -> Unit = {},
     onOpenAppearance: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
+    onOpenCalendars: () -> Unit = {},
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
 ) {
@@ -109,6 +110,16 @@ fun HomeScreen(
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
                 Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, color = Bento.Ink)
             }
+            // Which of the phone's calendars show here.
+            androidx.compose.material3.IconButton(
+                onClick = onOpenCalendars,
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.EventAvailable, contentDescription = "Calendários", tint = Bento.Blue,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             // Full-screen reminders: on/off, permissions, colour.
             androidx.compose.material3.IconButton(
                 onClick = onOpenReminders,

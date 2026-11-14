@@ -56,6 +56,7 @@ sealed interface Overlay {
     /** A picture shared from another app (Instagram, WhatsApp, Galeria...): whose photo is it? */
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
     data object Search : Overlay
+    data object Calendars : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -382,7 +383,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val (loaded, writable) = withContext(Dispatchers.IO) {
                 val ev = runCatching { Dedup.merge(calendars.eventsBetween(from, to)) }.getOrDefault(emptyList())
-                val cals = runCatching { calendars.writableCalendars() }.getOrDefault(emptyList())
+                val hidden = com.quarenta.calendario.data.CalendarChoice.hidden(getApplication())
+                val all = runCatching { calendars.writableCalendars() }.getOrDefault(emptyList())
+                // New events go to calendars that are shown, unless every one is hidden.
+                val cals = all.filter { it.id !in hidden }.ifEmpty { all }
                 ev to cals
             }
             loadedRange = from..to.minusDays(1)
@@ -398,6 +402,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Search: a year back and two years ahead, read once and kept until a calendar changes.
 
     fun openSearch() = push(Overlay.Search)
+
+    // ---- Which calendars this app shows -------------------------------------------------
+
+    fun openCalendars() = push(Overlay.Calendars)
+
+    suspend fun allCalendars(): List<com.quarenta.calendario.data.CalendarInfo> = withContext(Dispatchers.IO) {
+        if (!checkAccess()) emptyList() else runCatching { calendars.allCalendars() }.getOrDefault(emptyList())
+    }
+
+    val hiddenCalendars = com.quarenta.calendario.data.CalendarChoice.observe(app)
+
+    fun setCalendarShown(id: Long, shown: Boolean) {
+        val app = getApplication<Application>()
+        com.quarenta.calendario.data.CalendarChoice.setShown(app, id, shown)
+        loadedRange = LocalDate.MIN..LocalDate.MIN
+        refresh()
+        com.quarenta.calendario.widget.NextWidget.refresh(app)
+    }
 
     @Volatile private var searchPool: List<CalendarEvent>? = null
 
