@@ -1,5 +1,12 @@
 package com.quarenta.calendario
 
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import dev.chrisbanes.haze.hazeChild
+import dev.chrisbanes.haze.haze
 import android.Manifest
 import android.content.Intent
 import android.os.Bundle
@@ -190,12 +197,18 @@ private fun App(vm: AppViewModel) {
         snackbar.showSnackbar(text)
     }
 
+    // Frosted glass bars: the tabs scroll underneath the status bar and the tab bar.
+    val glass = remember { dev.chrisbanes.haze.HazeState() }
     Box(Modifier.fillMaxSize().background(Bento.Ground)) {
         Scaffold(
             containerColor = Bento.Ground,
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(containerColor = Bento.Tile) {
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier.hazeChild(glass, com.quarenta.calendario.ui.components.glassStyle()),
+                ) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
@@ -214,13 +227,20 @@ private fun App(vm: AppViewModel) {
                 }
             },
         ) { padding ->
-            Column(Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding())) {
+            val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            CompositionLocalProvider(
+                com.quarenta.calendario.ui.components.LocalBars provides PaddingValues(
+                    top = if (update == null) statusTop else 0.dp,
+                    bottom = padding.calculateBottomPadding(),
+                ),
+            ) {
+            Column(Modifier.fillMaxSize()) {
               update?.let { UpdateBanner(it, updateProgress, onUpdate = vm::startUpdate) }
               PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = vm::pullToRefresh,
                 state = pullState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().haze(glass),
                 indicator = {
                     PullToRefreshDefaults.Indicator(
                         state = pullState,
@@ -272,7 +292,14 @@ private fun App(vm: AppViewModel) {
                 }
               }
             }
+            }
         }
+
+        // The status bar is frosted glass too, so the tabs blur as they scroll under it.
+        if (update == null) Box(
+            Modifier.fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars)
+                .hazeChild(glass, com.quarenta.calendario.ui.components.glassStyle()),
+        )
 
         // Full-screen sheets drawn over the tabs: everything stays inside this app.
         // The last sheet stays drawn while it slides away.

@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.agenda
 
+import com.quarenta.calendario.ui.components.LocalBars
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -133,8 +133,12 @@ fun AgendaScreen(
     Box(Modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp,
+            top = LocalBars.current.calculateTopPadding(),
+            bottom = 96.dp + LocalBars.current.calculateBottomPadding(),
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
@@ -175,7 +179,7 @@ fun AgendaScreen(
         containerColor = Bento.Blue,
         contentColor = Color.White,
         shape = CircleShape,
-        modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).size(60.dp),
+        modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = LocalBars.current.calculateBottomPadding()).padding(20.dp).size(60.dp),
     ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", modifier = Modifier.size(30.dp)) }
     }
 }
@@ -329,7 +333,8 @@ private fun HighlightsPage(
     }
     val today = LocalDate.now()
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).statusBarsPadding().padding(bottom = 24.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(top = LocalBars.current.calculateTopPadding(), bottom = 24.dp + LocalBars.current.calculateBottomPadding()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {

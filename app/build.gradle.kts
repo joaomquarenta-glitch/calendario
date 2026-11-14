@@ -75,6 +75,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    // Frosted glass (real background blur on Android 12+, a soft tint before that)
+    implementation("dev.chrisbanes.haze:haze:1.1.1")
 
     val room = "2.6.1"
     implementation("androidx.room:room-runtime:$room")
