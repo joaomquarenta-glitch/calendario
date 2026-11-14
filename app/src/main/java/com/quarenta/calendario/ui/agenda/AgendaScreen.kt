@@ -80,6 +80,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import java.time.YearMonth
+import androidx.compose.material.icons.rounded.Search
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -105,6 +106,7 @@ fun AgendaScreen(
     people: List<Person> = emptyList(),
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
+    onSearch: () -> Unit = {},
 ) {
     // First the big cards; "Ver todos os compromissos" opens the full list.
     var showAll by rememberSaveable { mutableStateOf(false) }
@@ -114,6 +116,7 @@ fun AgendaScreen(
             events = events, people = people, photoFor = photoFor, birthYearFor = birthYearFor, hasCalendarAccess = hasCalendarAccess,
             onRequestAccess = onRequestAccess, onOpenEvent = onOpenEvent, onNewEvent = onNewEvent,
             onShowAll = { showAll = true },
+            onSearch = onSearch,
         )
         return
     }
@@ -151,6 +154,9 @@ fun AgendaScreen(
         item {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Agenda", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
+                IconButton(onClick = onSearch) {
+                    Icon(Icons.Rounded.Search, contentDescription = "Procurar compromissos", tint = Bento.Blue)
+                }
                 IconButton(onClick = { showAll = false }) {
                     Icon(Icons.Rounded.ViewCarousel, contentDescription = "Ver em destaque", tint = Bento.Blue)
                 }
@@ -402,6 +408,7 @@ private fun HighlightsPage(
     onOpenEvent: (CalendarEvent) -> Unit,
     onNewEvent: () -> Unit,
     onShowAll: () -> Unit,
+    onSearch: () -> Unit,
 ) {
     val now = System.currentTimeMillis()
     val upcoming = remember(events) {
@@ -418,6 +425,10 @@ private fun HighlightsPage(
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
                 Text("Agenda", style = MaterialTheme.typography.displaySmall, color = Bento.Ink)
             }
+            IconButton(
+                onClick = onSearch,
+                modifier = Modifier.padding(end = 8.dp).size(44.dp).clip(CircleShape).background(Bento.Tile),
+            ) { Icon(Icons.Rounded.Search, contentDescription = "Procurar compromissos", tint = Bento.Blue) }
             IconButton(
                 onClick = onNewEvent,
                 modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Blue),
