@@ -46,6 +46,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -211,9 +213,14 @@ private fun Label(text: String) {
 private fun PhotoTile(person: Person, label: String, onLongClick: () -> Unit, onClick: () -> Unit) {
     // Sharp for a tile a third of the screen wide, without holding every full-size photo in memory.
     val photo = rememberContactPhoto(person, full = true, maxPx = 640)
+    // Where the tile is on screen; a plain holder, so scrolling never recomposes.
+    val bounds = remember { arrayOfNulls<androidx.compose.ui.geometry.Rect>(1) }
     Box(
-        Modifier.fillMaxWidth().aspectRatio(0.8f).clip(RoundedCornerShape(22.dp))
-            .background(avatarColor(person.name)).holdable(onClick, onLongClick),
+        Modifier.fillMaxWidth().aspectRatio(0.8f)
+            .onGloballyPositioned { bounds[0] = it.boundsInRoot() }
+            .clip(RoundedCornerShape(22.dp))
+            .background(avatarColor(person.name))
+            .holdable({ bounds[0]?.let { com.quarenta.calendario.ui.components.PhotoZoom.remember(person.id, it) }; onClick() }, onLongClick),
     ) {
         if (photo != null) {
             Image(photo, contentDescription = null, contentScale = ContentScale.Crop, filterQuality = FilterQuality.High, modifier = Modifier.fillMaxSize())

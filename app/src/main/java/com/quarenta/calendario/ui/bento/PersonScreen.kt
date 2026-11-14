@@ -24,6 +24,18 @@ import com.quarenta.calendario.data.FieldKind
 import com.quarenta.calendario.data.WHATSAPP_BUSINESS_MIME
 import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.Constraints
+import com.quarenta.calendario.ui.components.PhotoZoom
+import kotlin.math.roundToInt
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -151,9 +163,31 @@ fun PersonScreen(
     onResetPhoto: () -> Unit = {},
 ) {
     var panel by remember(person.id) { mutableStateOf<Panel>(Panel.Card) }
-    BackHandler { if (panel != Panel.Card) panel = Panel.Card else onClose() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Opening from a photo tile: the photo grows out of the tile with a spring, like on the iPhone,
+    // and shrinks back into it on closing. Opened from anywhere else, the card simply appears.
+    val origin = remember(person.id) { PhotoZoom.take(person.id) }
+    val zoom = remember(person.id) { Animatable(if (origin != null) 0f else 1f) }
+    var closing by remember(person.id) { mutableStateOf(false) }
+    LaunchedEffect(person.id) {
+        if (origin != null) zoom.animateTo(1f, spring(dampingRatio = 0.82f, stiffness = 360f))
+    }
+    val close: () -> Unit = {
+        if (origin == null) onClose()
+        else if (!closing) {
+            closing = true
+            scope.launch {
+                zoom.animateTo(0f, spring(dampingRatio = 1f, stiffness = 520f))
+                onClose()
+            }
+        }
+    }
+    BackHandler { if (panel != Panel.Card) panel = Panel.Card else close() }
+    var rootOffset by remember { mutableStateOf(Offset.Zero) }
+    // The buttons and the name appear once the photo has almost finished growing.
+    val lateFade = Modifier.graphicsLayer { alpha = ((zoom.value - 0.6f) / 0.4f).coerceIn(0f, 1f) }
     val repo = remember { ContactsRepository(context) }
     val photo = rememberContactPhoto(person, full = true)
     com.quarenta.calendario.ui.components.HdrWhile(com.quarenta.calendario.ui.components.isHdr(photo?.asAndroidBitmap()))
@@ -226,11 +260,33 @@ fun PersonScreen(
     val now = Instant.now()
     val upcoming = eventsWith(person, events).filter { it.end.isAfter(now) }.take(5)
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Bento.Ground)) {
+    val ground = Bento.Ground
+    BoxWithConstraints(
+        Modifier.fillMaxSize()
+            .onGloballyPositioned { rootOffset = it.positionInRoot() }
+            .drawBehind { drawRect(ground.copy(alpha = ground.alpha * zoom.value.coerceIn(0f, 1f))) },
+    ) {
         val photoHeight = maxHeight * 0.5f
 
         // Top half: the photo stays fixed while the information scrolls underneath. Nothing ever covers it.
-        Box(Modifier.fillMaxWidth().height(photoHeight).background(avatarColor(person.name))) {
+        Box(
+            Modifier
+                .layout { measurable, constraints ->
+                    val w = constraints.maxWidth
+                    val h = photoHeight.roundToPx()
+                    val full = Rect(0f, 0f, w.toFloat(), h.toFloat())
+                    val r = origin?.let { PhotoZoom.between(it.translate(-rootOffset), full, zoom.value) } ?: full
+                    val placeable = measurable.measure(
+                        Constraints.fixed(r.width.roundToInt().coerceAtLeast(1), r.height.roundToInt().coerceAtLeast(1)),
+                    )
+                    layout(w, h) { placeable.place(r.left.roundToInt(), r.top.roundToInt()) }
+                }
+                .graphicsLayer {
+                    shape = RoundedCornerShape((22.dp.toPx() * (1f - zoom.value)).coerceAtLeast(0f))
+                    clip = origin != null
+                }
+                .background(avatarColor(person.name)),
+        ) {
             if (photo != null) {
                 Image(
                     photo, contentDescription = "Fotografia de ${person.name}",
@@ -244,12 +300,12 @@ fun PersonScreen(
                 )
             }
             Box(
-                Modifier.fillMaxWidth().height(180.dp).align(Alignment.BottomCenter)
+                Modifier.fillMaxWidth().height(180.dp).align(Alignment.BottomCenter).then(lateFade)
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)))),
             )
-            Row(Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp)) {
+            Row(Modifier.fillMaxWidth().then(lateFade).statusBarsPadding().padding(8.dp)) {
                 IconButton(
-                    onClick = { if (panel != Panel.Card) panel = Panel.Card else onClose() },
+                    onClick = { if (panel != Panel.Card) panel = Panel.Card else close() },
                     modifier = Modifier.size(44.dp).clip(CircleShape),
                     colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.35f), contentColor = Color.White),
                 ) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar") }
@@ -277,7 +333,7 @@ fun PersonScreen(
             // A small, see-through reminder that the chosen photo is getting old; tap to pick a newer one.
             photoWarning?.let { warning ->
                 Row(
-                    Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 14.dp)
+                    Modifier.align(Alignment.TopCenter).then(lateFade).statusBarsPadding().padding(top = 14.dp)
                         .clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).clickable { pickPhoto() }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -287,7 +343,7 @@ fun PersonScreen(
                     Text("$warning · Mudar", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
-            Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
+            Column(Modifier.align(Alignment.BottomStart).then(lateFade).padding(20.dp)) {
                 Text(person.name, color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 40.sp)
                 val role = listOfNotNull(details?.jobTitle, details?.company).joinToString(" · ")
                 if (role.isNotBlank()) Text(role, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -301,6 +357,10 @@ fun PersonScreen(
         Column(
             Modifier
                 .padding(top = photoHeight)
+                .graphicsLayer {
+                    alpha = zoom.value.coerceIn(0f, 1f)
+                    translationY = (1f - zoom.value) * 80.dp.toPx()
+                }
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
