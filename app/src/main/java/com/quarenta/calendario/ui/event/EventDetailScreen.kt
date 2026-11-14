@@ -94,6 +94,7 @@ fun EventDetailScreen(
     birthYearFor: suspend (Person) -> Int? = { null },
     plan: EventPlan? = null,
     onSavePlan: (EventPlan) -> Unit = {},
+    phoneFor: suspend (Person) -> String? = { null },
 ) {
     BackHandler(onBack = onClose)
     val context = LocalContext.current
@@ -166,6 +167,15 @@ fun EventDetailScreen(
                     dayHeading(day) + if (event.allDay) "" else " · ${event.timeRange()}",
                     fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary, modifier = Modifier.padding(start = 4.dp),
                 )
+            }
+            if (birthday && person != null) {
+                WishesCard(
+                    person = person,
+                    turns = birthYear?.let { day.year - it }?.takeIf { it in 1..130 },
+                    daysLeft = java.time.temporal.ChronoUnit.DAYS.between(today, day).toInt().coerceAtLeast(0),
+                    phoneFor = phoneFor,
+                )
+                GiftIdeasCard(person)
             }
             PlanCard(
                 key = Highlights.planKey(event.id, day),

@@ -62,6 +62,7 @@ sealed interface Overlay {
     /** A picture shared from another app (Instagram, WhatsApp, Galeria...): whose photo is it? */
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
     data object Search : Overlay
+    data object Birthdays : Overlay
     data class Calendars(val prefillUrl: String? = null) : Overlay
 }
 
@@ -77,6 +78,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _people = MutableStateFlow<List<Person>>(emptyList())
     val people: StateFlow<List<Person>> = _people.asStateFlow()
+    private val _birthdays = MutableStateFlow<List<com.quarenta.calendario.data.Birthdays.Entry>>(emptyList())
+    /** Everyone's next birthday from the phone's contacts, soonest first. */
+    val birthdays: StateFlow<List<com.quarenta.calendario.data.Birthdays.Entry>> = _birthdays.asStateFlow()
+
 
     private val _hasCalendarAccess = MutableStateFlow(checkAccess())
     val hasCalendarAccess: StateFlow<Boolean> = _hasCalendarAccess.asStateFlow()
@@ -200,7 +205,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!checkContacts()) return
         viewModelScope.launch {
             _people.value = withContext(Dispatchers.IO) { runCatching { contacts.all() }.getOrDefault(emptyList()) }
+            refreshBirthdays()
         }
+    }
+
+    private suspend fun refreshBirthdays() {
+        val list = people.value
+        _birthdays.value = withContext(Dispatchers.IO) {
+            runCatching {
+                val dates = contacts.birthdays()
+                com.quarenta.calendario.data.Birthdays.upcoming(
+                    list.mapNotNull { p -> dates[p.id]?.let { Triple(p.id, p.name, it) } },
+                    java.time.LocalDate.now(),
+                )
+            }.getOrDefault(emptyList())
+        }
+    }
+
+    fun openBirthdays() = push(Overlay.Birthdays)
+
+    /** The person's mobile number (for WhatsApp), or any number they have. */
+    suspend fun phoneFor(person: Person): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val phones = contacts.details(person).fields.filter { it.kind == com.quarenta.calendario.data.FieldKind.Phone }
+            (phones.firstOrNull { it.type == android.provider.ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE } ?: phones.firstOrNull())?.value
+        }.getOrNull()
     }
 
     fun openPerson(person: Person) = push(Overlay.PersonCard(person))

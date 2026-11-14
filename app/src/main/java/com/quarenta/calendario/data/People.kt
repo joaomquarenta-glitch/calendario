@@ -190,6 +190,29 @@ class ContactsRepository(private val context: Context) {
         )
     }
 
+    /** Every contact's birthday in one read: contact id to (day, year of birth if known). */
+    fun birthdays(): Map<Long, Pair<MonthDay, Int?>> {
+        val out = mutableMapOf<Long, Pair<MonthDay, Int?>>()
+        resolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(ContactsContract.Data.CONTACT_ID, ContactsContract.CommonDataKinds.Event.START_DATE),
+            "${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?",
+            arrayOf(
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString(),
+            ),
+            null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(0)
+                val date = c.getString(1)?.let { ContactFormat.parseDate(it) } ?: continue
+                // Keep the copy that knows the year, when two accounts disagree.
+                if (out[id]?.second == null) out[id] = date
+            }
+        }
+        return out
+    }
+
     private fun labelFor(kind: FieldKind, type: Int): String? = kind.types.firstOrNull { it.type == type }?.label
 
     private fun groupTitles(ids: List<Long>): Map<Long, String> {
