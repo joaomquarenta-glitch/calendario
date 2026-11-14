@@ -31,4 +31,8 @@ object NextWidgetText {
             else -> Lines(title, whenText)
         }
     }
+
+    /** One line in the list under the photo on the large widget: "Amanhã 20:00 · Jantar". */
+    fun row(title: String, day: LocalDate, today: LocalDate, time: String?): String =
+        (Highlights.shortDay(day, today) + (time?.let { " $it" } ?: "")).replaceFirstChar { it.uppercase() } + " · " + title
 }

@@ -16,6 +16,8 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import android.os.Build
+import android.util.SizeF
 import android.provider.CalendarContract
 import android.view.View
 import android.widget.RemoteViews
@@ -68,12 +70,13 @@ class NextWidget : AppWidgetProvider() {
             val zone = ZoneId.systemDefault()
             val today = LocalDate.now(zone)
             val now = System.currentTimeMillis()
-            val next: CalendarEvent? = if (granted(context, Manifest.permission.READ_CALENDAR)) {
+            val upcoming: List<CalendarEvent> = if (granted(context, Manifest.permission.READ_CALENDAR)) {
                 runCatching {
                     val events = Dedup.merge(CalendarRepository(context).eventsBetween(today, today.plusDays(60)))
-                    Highlights.upcoming(events, now, endMs = { it.end.toEpochMilli() }, startMs = { it.start.toEpochMilli() }, max = 1).firstOrNull()
-                }.getOrNull()
-            } else null
+                    Highlights.upcoming(events, now, endMs = { it.end.toEpochMilli() }, startMs = { it.start.toEpochMilli() }, max = 4)
+                }.getOrNull().orEmpty()
+            } else emptyList()
+            val next = upcoming.firstOrNull()
 
             var person: Person? = null
             var photo: Bitmap? = null
@@ -91,9 +94,14 @@ class NextWidget : AppWidgetProvider() {
                 }
             }
 
-            val views = RemoteViews(context.packageName, R.layout.widget_next)
+            // Made once and shared by every size, so the photo travels to the home screen only once.
+            val picture = photo ?: gradient(next?.color ?: Color.rgb(10, 132, 255))
+
+            // One design per size: 2x2 (photo and when), 4x2 (as before) and 4x4 (plus the next three).
+            fun build(layout: Int): RemoteViews {
+            val views = RemoteViews(context.packageName, layout)
             if (next == null) {
-                views.setImageViewBitmap(R.id.widget_photo, gradient(Color.rgb(10, 132, 255)))
+                views.setImageViewBitmap(R.id.widget_photo, picture)
                 views.setTextViewText(R.id.widget_headline, context.getString(R.string.widget_next_empty))
                 views.setTextViewText(R.id.widget_subline, "")
                 views.setViewVisibility(R.id.widget_subline, View.GONE)
@@ -105,25 +113,52 @@ class NextWidget : AppWidgetProvider() {
                     time = if (next.allDay) null else start.format(DateTimeFormatter.ofPattern("HH:mm")),
                     person = person, hasPhoto = photo != null,
                 )
-                views.setImageViewBitmap(R.id.widget_photo, photo ?: gradient(next.color))
+                views.setImageViewBitmap(R.id.widget_photo, picture)
                 views.setTextViewText(R.id.widget_headline, lines.headline)
                 views.setTextViewText(R.id.widget_subline, lines.subline)
                 views.setViewVisibility(R.id.widget_subline, if (lines.subline.isEmpty()) View.GONE else View.VISIBLE)
             }
-            views.setOnClickPendingIntent(R.id.widget_root, openIntent(context, next))
+            views.setOnClickPendingIntent(R.id.widget_root, openIntent(context, next, 7001))
+            if (layout == R.layout.widget_next_large) {
+                val rowIds = intArrayOf(R.id.widget_row1, R.id.widget_row2, R.id.widget_row3)
+                rowIds.forEachIndexed { i, id ->
+                    val e = upcoming.getOrNull(i + 1)
+                    if (e == null) views.setViewVisibility(id, View.GONE) else {
+                        val start = e.start.atZone(zone)
+                        views.setTextViewText(
+                            id,
+                            NextWidgetText.row(e.title, start.toLocalDate(), today, if (e.allDay) null else start.format(DateTimeFormatter.ofPattern("HH:mm"))),
+                        )
+                        views.setViewVisibility(id, View.VISIBLE)
+                        views.setOnClickPendingIntent(id, openIntent(context, e, 7010 + i))
+                    }
+                }
+            }
+            return views
+            }
+
+            val views = if (Build.VERSION.SDK_INT >= 31) {
+                RemoteViews(
+                    mapOf(
+                        SizeF(100f, 100f) to build(R.layout.widget_next_small),
+                        SizeF(200f, 100f) to build(R.layout.widget_next),
+                        SizeF(200f, 260f) to build(R.layout.widget_next_large),
+                    ),
+                )
+            } else build(R.layout.widget_next)
             ids.forEach { manager.updateAppWidget(it, views) }
             scheduleNext(context, next, now)
         }
 
         /** Opens the event in the app; with nothing coming up, opens the app. */
-        private fun openIntent(context: Context, event: CalendarEvent?): PendingIntent {
+        private fun openIntent(context: Context, event: CalendarEvent?, requestCode: Int): PendingIntent {
             val intent = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             if (event != null) {
                 intent.action = Intent.ACTION_VIEW
                 intent.data = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id)
             }
-            return PendingIntent.getActivity(context, 7001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            return PendingIntent.getActivity(context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
 
         /** Wakes the widget again when the current event ends, so it moves on to the next one. */
