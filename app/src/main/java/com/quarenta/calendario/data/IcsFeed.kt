@@ -102,7 +102,7 @@ object IcsFeed {
             .split('\n').filter { it.isNotBlank() }
 
     private fun unescape(s: String) =
-        s.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\;", ";").replace("\\\\", "\\")
+        s.replace("\\n", "\n").replace("\\N", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
 
     private val dateTime = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
     private val dateOnly = DateTimeFormatter.ofPattern("yyyyMMdd")
