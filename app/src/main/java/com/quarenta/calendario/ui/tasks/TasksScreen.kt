@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.tasks
 
+import com.quarenta.calendario.ui.components.LocalBars
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -65,8 +65,12 @@ fun TasksScreen(
     ).filter { it.second.isNotEmpty() }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp, end = 16.dp,
+            top = LocalBars.current.calculateTopPadding(),
+            bottom = 24.dp + LocalBars.current.calculateBottomPadding(),
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
