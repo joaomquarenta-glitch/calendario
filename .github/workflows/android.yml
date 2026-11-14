@@ -9,6 +9,12 @@ on:
 permissions:
   contents: write
 
+# Builds on main run one at a time, in merge order, so the newest merge is always
+# the release the app sees as "latest" (several quick merges used to finish out of order).
+concurrency:
+  group: ${{ github.event_name == 'push' && 'release-main' || format('pr-{0}', github.ref) }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
