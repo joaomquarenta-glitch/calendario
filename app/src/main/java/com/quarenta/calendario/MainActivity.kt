@@ -332,8 +332,17 @@ private fun App(vm: AppViewModel) {
                     onToggleFavourite = { withWriteAccess { vm.toggleFavourite(o.person) } },
                     withWriteAccess = withWriteAccess,
                     onClose = vm::closeOverlay,
+                    onPickPhoto = { uri -> vm.setPhoto(o.person, uri) },
+                    onResetPhoto = { vm.resetPhoto(o.person) },
                 )
             }
+            is Overlay.PhotoTarget -> com.quarenta.calendario.ui.bento.PhotoTargetScreen(
+                uri = o.uri,
+                people = people,
+                hasContactsAccess = hasContacts,
+                onPick = { person -> vm.setPhoto(person, o.uri, openCard = true) },
+                onClose = vm::closeOverlay,
+            )
         } }
     }
 }

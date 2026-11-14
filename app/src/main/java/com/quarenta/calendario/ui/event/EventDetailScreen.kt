@@ -54,6 +54,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -100,7 +101,8 @@ fun EventDetailScreen(
     val today = LocalDate.now()
     val day = event.start.localDate()
     val birthday = Highlights.isBirthday(event.title, event.sources)
-    val photo by produceState<Bitmap?>(null, person?.id) { value = person?.let { photoFor(it) } }
+    val photoVersion by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
+    val photo by produceState<Bitmap?>(null, person?.id, photoVersion) { value = person?.let { photoFor(it) } }
     val birthYear by produceState<Int?>(null, person?.id, birthday) {
         value = if (birthday && person != null) birthYearFor(person) else null
     }

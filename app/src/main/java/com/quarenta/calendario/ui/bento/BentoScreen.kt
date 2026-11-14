@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -82,13 +83,14 @@ private fun scaledDown(b: android.graphics.Bitmap, maxPx: Int): android.graphics
 @Composable
 fun rememberContactPhoto(person: Person, full: Boolean, maxPx: Int? = null): ImageBitmap? {
     val context = LocalContext.current
-    val state by produceState<ImageBitmap?>(null, person.id, full) {
+    val version by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
+    val state by produceState<ImageBitmap?>(null, person.id, full, version) {
         value = withContext(Dispatchers.IO) {
             runCatching {
                 if (full) {
-                    com.quarenta.calendario.data.ContactsRepository(context).photo(person)?.let { b -> if (maxPx != null) scaledDown(b, maxPx) else b }?.asImageBitmap()
+                    com.quarenta.calendario.data.ContactsRepository(context).photo(person, maxPx)?.let { b -> if (maxPx != null) scaledDown(b, maxPx) else b }?.asImageBitmap()
                 } else {
-                    person.thumbUri?.let { uri ->
+                    com.quarenta.calendario.data.PersonPhotos(context).load(person, maxPx ?: 384)?.asImageBitmap() ?: person.thumbUri?.let { uri ->
                         context.contentResolver.openInputStream(android.net.Uri.parse(uri))?.use {
                             android.graphics.BitmapFactory.decodeStream(it)?.asImageBitmap()
                         }

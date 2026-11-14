@@ -53,6 +53,8 @@ sealed interface Overlay {
     data class PersonCard(val person: Person) : Overlay
     data object Appearance : Overlay
     data object Reminders : Overlay
+    /** A picture shared from another app (Instagram, WhatsApp, Galeria...): whose photo is it? */
+    data class PhotoTarget(val uri: android.net.Uri) : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -197,7 +199,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openReminders() = push(Overlay.Reminders)
 
     // Full-size contact photos for the big agenda cards, decoded once and kept while the app is open.
-    private val photoCache = android.util.LruCache<Long, android.graphics.Bitmap>(24)
+    // Sized by memory, because chosen photos are kept in high resolution.
+    private val photoCache = object : android.util.LruCache<Long, android.graphics.Bitmap>(
+        (Runtime.getRuntime().maxMemory() / 8).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+    ) {
+        override fun sizeOf(key: Long, value: android.graphics.Bitmap) = value.allocationByteCount
+    }
+    private val chosenPhotos = com.quarenta.calendario.data.PersonPhotos(app)
+
+    /** When the high-resolution photo chosen for [person] was taken, or null if they use the contact's photo. */
+    fun chosenPhotoDate(person: Person): java.time.LocalDate? = chosenPhotos.takenAt(person)
+
+    /** Keeps [uri] as [person]'s photo, in high resolution, everywhere in the app and on the widget. */
+    fun setPhoto(person: Person, uri: android.net.Uri, openCard: Boolean = false) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { chosenPhotos.save(person, uri) }
+            if (!ok) {
+                _message.value = "Não foi possível usar esta fotografia"
+                return@launch
+            }
+            photoCache.remove(person.id)
+            com.quarenta.calendario.widget.NextWidget.refresh(getApplication())
+            if (openCard) replaceAll(Overlay.PersonCard(person))
+            _message.value = "Nova fotografia de ${person.name.substringBefore(' ')}"
+        }
+    }
+
+    /** Goes back to the photo stored in the phone's contact. */
+    fun resetPhoto(person: Person) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { chosenPhotos.remove(person) }
+            photoCache.remove(person.id)
+            com.quarenta.calendario.widget.NextWidget.refresh(getApplication())
+            _message.value = "Voltou a fotografia dos contactos"
+        }
+    }
 
     private val birthYears = mutableMapOf<Long, Int?>()
 
@@ -227,7 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The largest photo the phone has for [person], or null. Runs off the main thread. */
     suspend fun photoFor(person: Person): android.graphics.Bitmap? {
         photoCache.get(person.id)?.let { return it }
-        val bitmap = withContext(Dispatchers.IO) { runCatching { contacts.photo(person) }.getOrNull() } ?: return null
+        val bitmap = withContext(Dispatchers.IO) { runCatching { contacts.photo(person, maxPx = 2048) }.getOrNull() } ?: return null
         photoCache.put(person.id, bitmap)
         return bitmap
     }
@@ -420,6 +456,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Handles "Add to calendar" buttons and .ics files sent by other apps. */
     fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
+            @Suppress("DEPRECATION")
+            val uri = intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)
+            if (uri != null) replaceAll(Overlay.PhotoTarget(uri))
+            return
+        }
         val request = IncomingEvent.parse(getApplication(), intent) ?: return
         when (request) {
             is IncomingRequest.Add -> replaceAll(Overlay.Editor(request.draft, fromOtherApp = true))

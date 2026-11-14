@@ -73,6 +73,13 @@
                 <data android:mimeType="application/ics" />
             </intent-filter>
 
+            <!-- A picture shared from Instagram, WhatsApp or the gallery becomes someone's HD photo -->
+            <intent-filter android:label="Foto de pessoa">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+
             <!-- Google "Add to calendar" links (calendar.google.com/calendar/render?action=TEMPLATE...) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
