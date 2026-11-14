@@ -73,6 +73,13 @@ import com.quarenta.calendario.ui.startsIn
 import com.quarenta.calendario.ui.theme.Bento
 import com.quarenta.calendario.ui.timeRange
 import com.quarenta.calendario.ui.weekdayShort
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import java.time.YearMonth
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
@@ -191,57 +198,126 @@ private fun WeekStrip(
     byDay: Map<LocalDate, List<CalendarEvent>>,
     onSelect: (LocalDate) -> Unit,
 ) {
+    // Tap the month name to open the whole month, tap it again to fold back to the week. Swipe to move.
+    var monthOpen by rememberSaveable { mutableStateOf(false) }
     val monday = selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    Column(Modifier.fillMaxWidth()) {
+    val shownMonth = if (monthOpen) YearMonth.from(selected) else YearMonth.from(monday)
+    fun step(forward: Boolean) {
+        if (monthOpen) {
+            val to = if (forward) shownMonth.plusMonths(1) else shownMonth.minusMonths(1)
+            onSelect(MonthMath.moveSelection(selected, to, today))
+        } else {
+            onSelect(if (forward) selected.plusWeeks(1) else selected.minusWeeks(1))
+        }
+    }
+    var drag by remember { mutableStateOf(0f) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 500f))
+            .pointerInput(monthOpen, selected) {
+                detectHorizontalDragGestures(
+                    onDragStart = { drag = 0f },
+                    onDragEnd = { if (kotlin.math.abs(drag) > 120f) step(forward = drag < 0) },
+                    onHorizontalDrag = { _, amount -> drag += amount },
+                )
+            },
+    ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onSelect(selected.minusWeeks(1)) }) {
-                Icon(Icons.Rounded.ChevronLeft, contentDescription = "Semana anterior", tint = Bento.Blue)
+            IconButton(onClick = { step(forward = false) }) {
+                Icon(Icons.Rounded.ChevronLeft, contentDescription = if (monthOpen) "Mês anterior" else "Semana anterior", tint = Bento.Blue)
             }
-            Text(
-                "${monthLong(monday).replaceFirstChar { it.uppercase() }} ${monday.year}",
-                modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
-                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Bento.Ink,
-            )
-            IconButton(onClick = { onSelect(selected.plusWeeks(1)) }) {
-                Icon(Icons.Rounded.ChevronRight, contentDescription = "Semana seguinte", tint = Bento.Blue)
+            Row(
+                Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { monthOpen = !monthOpen }.padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${monthLong(shownMonth.atDay(1)).replaceFirstChar { it.uppercase() }} ${shownMonth.year}",
+                    fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Bento.Ink,
+                )
+                Icon(
+                    if (monthOpen) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = if (monthOpen) "Ver só a semana" else "Ver o mês inteiro",
+                    tint = Bento.Blue, modifier = Modifier.size(22.dp),
+                )
+            }
+            IconButton(onClick = { step(forward = true) }) {
+                Icon(Icons.Rounded.ChevronRight, contentDescription = if (monthOpen) "Mês seguinte" else "Semana seguinte", tint = Bento.Blue)
             }
         }
-        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+        Row(Modifier.fillMaxWidth()) {
             for (i in 0 until 7) {
                 val d = monday.plusDays(i.toLong())
-                val isSel = d == selected
-                val isToday = d == today
-                Column(
-                    Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { onSelect(d) }.padding(vertical = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(weekdayShort(d), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = if (isToday) Bento.RedText else Bento.Secondary)
-                    Box(
-                        Modifier.size(40.dp).clip(CircleShape).background(
-                            when {
-                                isSel && isToday -> Bento.Red
-                                isSel -> Bento.Ink
-                                else -> Bento.Tile
-                            },
-                        ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "${d.dayOfMonth}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold,
-                            color = when {
-                                isSel -> Color.White
-                                isToday -> Bento.RedText
-                                else -> Bento.Ink
-                            },
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.height(6.dp)) {
-                        byDay[d].orEmpty().take(3).forEach {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(it.composeColor()))
-                        }
-                    }
+                Text(
+                    weekdayShort(d), modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    color = if (d.dayOfWeek == today.dayOfWeek) Bento.RedText else Bento.Secondary,
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        val weeks = if (monthOpen) MonthMath.days(shownMonth).chunked(7) else listOf(List(7) { monday.plusDays(it.toLong()) })
+        weeks.forEach { week ->
+            Row(Modifier.fillMaxWidth().padding(bottom = if (monthOpen) 2.dp else 6.dp)) {
+                week.forEach { d ->
+                    DayCell(
+                        date = d, today = today, selected = selected,
+                        outside = monthOpen && YearMonth.from(d) != shownMonth,
+                        compact = monthOpen,
+                        events = byDay[d].orEmpty(),
+                        modifier = Modifier.weight(1f),
+                    ) { onSelect(d) }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayCell(
+    date: LocalDate,
+    today: LocalDate,
+    selected: LocalDate,
+    outside: Boolean,
+    compact: Boolean,
+    events: List<CalendarEvent>,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val isSel = date == selected
+    val isToday = date == today
+    val circle = if (compact) 36.dp else 40.dp
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(vertical = if (compact) 2.dp else 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Box(
+            Modifier.size(circle).clip(CircleShape).background(
+                when {
+                    isSel && isToday -> Bento.Red
+                    isSel -> Bento.Ink
+                    compact -> Color.Transparent
+                    else -> Bento.Tile
+                },
+            ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "${date.dayOfMonth}", fontSize = if (compact) 16.sp else 18.sp,
+                fontWeight = if (compact && !isSel && !isToday) FontWeight.SemiBold else FontWeight.ExtraBold,
+                color = when {
+                    isSel -> Color.White
+                    isToday -> Bento.RedText
+                    outside -> Bento.Secondary.copy(alpha = 0.5f)
+                    else -> Bento.Ink
+                },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.height(6.dp)) {
+            events.take(3).forEach {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(if (outside) it.composeColor().copy(alpha = 0.4f) else it.composeColor()))
             }
         }
     }
