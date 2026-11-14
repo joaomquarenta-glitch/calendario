@@ -276,6 +276,7 @@ private fun App(vm: AppViewModel) {
                         people = people,
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
+                        onSearch = vm::openSearch,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
@@ -354,6 +355,11 @@ private fun App(vm: AppViewModel) {
             Overlay.Appearance -> AppearanceScreen(
                 selectedId = ThemeState.selectedId,
                 onSelect = vm::setTheme,
+                onClose = vm::closeOverlay,
+            )
+            Overlay.Search -> com.quarenta.calendario.ui.agenda.SearchScreen(
+                pool = vm::searchPool,
+                onOpenEvent = vm::openEvent,
                 onClose = vm::closeOverlay,
             )
             Overlay.Reminders -> RemindersScreen(onClose = vm::closeOverlay, sample = vm::sampleReminder)

@@ -55,6 +55,7 @@ sealed interface Overlay {
     data object Reminders : Overlay
     /** A picture shared from another app (Instagram, WhatsApp, Galeria...): whose photo is it? */
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
+    data object Search : Overlay
 }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -367,6 +368,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
+        searchPool = null
         _hasCalendarAccess.value = checkAccess()
         if (!checkAccess()) return
         if (!observing) {
@@ -392,6 +394,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- Overlays: detail and editor ------------------------------------------------
 
     fun openEvent(event: CalendarEvent) = push(Overlay.Detail(event))
+
+    // ---- Search: a year back and two years ahead, read once and kept until a calendar changes.
+
+    fun openSearch() = push(Overlay.Search)
+
+    @Volatile private var searchPool: List<CalendarEvent>? = null
+
+    suspend fun searchPool(): List<CalendarEvent> = searchPool ?: withContext(Dispatchers.IO) {
+        if (!checkAccess()) return@withContext emptyList()
+        val today = LocalDate.now()
+        runCatching { Dedup.merge(calendars.eventsBetween(today.minusYears(1), today.plusYears(2))) }
+            .getOrDefault(emptyList())
+            .also { searchPool = it }
+    }
 
     fun newEvent(date: LocalDate = _selectedDate.value) {
         val zone = java.time.ZoneId.systemDefault()
