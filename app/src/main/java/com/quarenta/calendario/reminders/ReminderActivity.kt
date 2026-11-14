@@ -196,6 +196,7 @@ private fun ReminderScreen(
         // Top half: the person, never covered by anything.
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(Color.White.copy(alpha = 0.16f))) {
             val photo = person?.photo
+            com.quarenta.calendario.ui.components.HdrWhile(com.quarenta.calendario.ui.components.isHdr(photo))
             if (photo != null) {
                 Image(
                     photo.asImageBitmap(), contentDescription = person?.person?.name,
