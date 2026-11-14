@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material3.Icon
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -198,7 +199,8 @@ private fun NextBlock(
     onOpen: () -> Unit,
 ) {
     val color = next?.composeColor() ?: Bento.Blue
-    val photo by produceState<Bitmap?>(null, person?.id) { value = person?.let { photoFor(it) } }
+    val photoVersion by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
+    val photo by produceState<Bitmap?>(null, person?.id, photoVersion) { value = person?.let { photoFor(it) } }
     val birthday = next != null && Highlights.isBirthday(next.title, next.sources)
     val birthYear by produceState<Int?>(null, person?.id, birthday) {
         value = if (birthday && person != null) birthYearFor(person) else null

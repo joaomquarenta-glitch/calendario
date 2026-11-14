@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -124,7 +125,8 @@ private fun HighlightCard(
     onOpen: () -> Unit,
 ) {
     val color = event.composeColor()
-    val photo by produceState<Bitmap?>(null, person?.id) { value = person?.let { photoFor(it) } }
+    val photoVersion by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
+    val photo by produceState<Bitmap?>(null, person?.id, photoVersion) { value = person?.let { photoFor(it) } }
     val birthday = Highlights.isBirthday(event.title, event.sources)
     val birthYear by produceState<Int?>(null, person?.id, birthday) {
         value = if (birthday && person != null) birthYearFor(person) else null

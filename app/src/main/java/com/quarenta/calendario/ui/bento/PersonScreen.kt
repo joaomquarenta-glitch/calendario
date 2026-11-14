@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.rounded.Chat
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -144,6 +146,8 @@ fun PersonScreen(
     onToggleFavourite: () -> Unit,
     withWriteAccess: (() -> Unit) -> Unit,
     onClose: () -> Unit,
+    onPickPhoto: (Uri) -> Unit = {},
+    onResetPhoto: () -> Unit = {},
 ) {
     var panel by remember(person.id) { mutableStateOf<Panel>(Panel.Card) }
     BackHandler { if (panel != Panel.Card) panel = Panel.Card else onClose() }
@@ -151,6 +155,18 @@ fun PersonScreen(
     val scope = rememberCoroutineScope()
     val repo = remember { ContactsRepository(context) }
     val photo = rememberContactPhoto(person, full = true)
+    // A high-resolution photo chosen in this app, and when it was taken (for the "more than a year" warning).
+    val photoVersion by com.quarenta.calendario.data.PersonPhotos.version.collectAsState()
+    val chosenPhotoDate by produceState<LocalDate?>(null, person.id, photoVersion) {
+        value = withContext(Dispatchers.IO) { runCatching { com.quarenta.calendario.data.PersonPhotos(context).takenAt(person) }.getOrNull() }
+    }
+    val photoWarning = com.quarenta.calendario.data.PhotoMath.ageWarning(chosenPhotoDate, LocalDate.now())
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onPickPhoto(uri)
+    }
+    val pickPhoto = {
+        photoPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
     var reload by remember { mutableIntStateOf(0) }
     val details by produceState<PersonDetails?>(null, person.id, reload) {
         value = withContext(Dispatchers.IO) { runCatching { repo.details(person) }.getOrNull() }
@@ -237,6 +253,12 @@ fun PersonScreen(
                 ) { Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar") }
                 Spacer(Modifier.weight(1f))
                 IconButton(
+                    onClick = pickPhoto,
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.Black.copy(alpha = 0.35f), contentColor = Color.White),
+                ) { Icon(Icons.Rounded.PhotoCamera, contentDescription = "Escolher fotografia") }
+                Spacer(Modifier.size(8.dp))
+                IconButton(
                     onClick = onToggleFavourite,
                     modifier = Modifier.size(44.dp).clip(CircleShape),
                     colors = IconButtonDefaults.iconButtonColors(
@@ -248,6 +270,19 @@ fun PersonScreen(
                         if (person.starred) Icons.Rounded.Star else Icons.Rounded.StarBorder,
                         contentDescription = if (person.starred) "Tirar dos favoritos" else "Pôr nos favoritos",
                     )
+                }
+            }
+            // A small, see-through reminder that the chosen photo is getting old; tap to pick a newer one.
+            photoWarning?.let { warning ->
+                Row(
+                    Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 14.dp)
+                        .clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)).clickable { pickPhoto() }
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Rounded.History, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.size(6.dp))
+                    Text("$warning · Mudar", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
             Column(Modifier.align(Alignment.BottomStart).padding(20.dp)) {
@@ -370,6 +405,33 @@ fun PersonScreen(
                             onTap = { f -> if (!openField(context, f)) panel = Panel.Edit(f.kind, null, f) },
                             onEdit = { f -> panel = Panel.Edit(f.kind, null, f) },
                         )
+                    }
+
+                    // The photo: a high-resolution one from the gallery, or the contact's own.
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Pastels.Lavender.first)) {
+                        Row(
+                            Modifier.fillMaxWidth().clickable { pickPhoto() }.padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(28.dp).clip(CircleShape).background(Pastels.Lavender.second), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(Modifier.size(10.dp))
+                            Text("FOTOGRAFIA", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Pastels.Lavender.second, letterSpacing = 0.6.sp)
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                chosenPhotoDate?.let { "Alta resolução · ${monthShort(it)} ${it.year}" } ?: "Escolher em HD",
+                                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Bento.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (chosenPhotoDate != null) {
+                            HorizontalDivider(color = Pastels.Lavender.second.copy(alpha = 0.15f), modifier = Modifier.padding(horizontal = 16.dp))
+                            Text(
+                                "Usar a fotografia dos contactos",
+                                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Pastels.Lavender.second,
+                                modifier = Modifier.fillMaxWidth().clickable { onResetPhoto() }.padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        }
                     }
 
                     // Ringtone, always shown so it can be changed in one tap.

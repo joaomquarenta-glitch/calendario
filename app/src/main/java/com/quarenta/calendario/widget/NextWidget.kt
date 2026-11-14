@@ -85,7 +85,7 @@ class NextWidget : AppWidgetProvider() {
                     val people = repo.all()
                     person = PersonMatch.inTitle(next.title, people.map { it.id to it.name })?.let { id -> people.firstOrNull { it.id == id } }
                     person?.let { p ->
-                        photo = repo.photo(p)?.let(::fitted)
+                        photo = repo.photo(p, maxPx = 1800)?.let(::fitted)
                         if (birthday) birthYear = runCatching { repo.details(p).birthYear }.getOrNull()
                     }
                 }

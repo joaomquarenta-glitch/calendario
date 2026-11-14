@@ -38,7 +38,7 @@ object ReminderPeople {
         val byId = people.associateBy { it.id }
         val contactId = fromGuests(context, a.eventId) ?: PersonMatch.inTitle(a.title, people.map { it.id to it.name })
         val person = contactId?.let { byId[it] } ?: return null
-        ReminderPerson(person, repo.photo(person), runCatching { repo.details(person) }.getOrNull())
+        ReminderPerson(person, repo.photo(person, maxPx = 2048), runCatching { repo.details(person) }.getOrNull())
     }.getOrNull()
 
     /** A guest of the event who is in the phone's contacts (not the person themself, who is the organiser). */

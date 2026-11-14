@@ -315,8 +315,16 @@ class ContactsRepository(private val context: Context) {
             resolver.delete(ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id), null, null) > 0
     }.getOrDefault(false)
 
-    /** The largest photo the phone has for this person (full-size when synced, not the thumbnail). */
-    fun photo(person: Person): Bitmap? = runCatching {
+    private val chosen = PersonPhotos(context)
+
+    /**
+     * The best photo for this person: the high-resolution one chosen in this app, otherwise the
+     * largest the phone has (full-size when synced, not the thumbnail). [maxPx] caps the longest side.
+     */
+    fun photo(person: Person, maxPx: Int? = null): Bitmap? =
+        chosen.load(person, maxPx) ?: contactPhoto(person)
+
+    private fun contactPhoto(person: Person): Bitmap? = runCatching {
         val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, person.id)
         ContactsContract.Contacts.openContactPhotoInputStream(resolver, contactUri, true)?.use {
             BitmapFactory.decodeStream(it)
