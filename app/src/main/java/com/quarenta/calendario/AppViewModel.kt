@@ -192,6 +192,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshPeople()
         val app = getApplication<Application>()
         viewModelScope.launch(Dispatchers.IO) { runCatching { com.quarenta.calendario.reminders.ReminderScheduler.reschedule(app) } }
+        viewModelScope.launch(Dispatchers.IO) { runCatching { com.quarenta.calendario.reminders.MorningBrief.schedule(app) } }
     }
 
     fun refreshPeople() {

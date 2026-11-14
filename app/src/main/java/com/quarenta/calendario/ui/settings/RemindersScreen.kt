@@ -39,6 +39,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import com.quarenta.calendario.reminders.MorningBrief
 import com.quarenta.calendario.reminders.ReminderActivity
 import com.quarenta.calendario.reminders.ReminderAlert
 import com.quarenta.calendario.reminders.ReminderColors
@@ -79,6 +81,8 @@ fun RemindersScreen(onClose: () -> Unit, sample: () -> ReminderAlert) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refresh++ }
     var enabled by remember { mutableStateOf(ReminderScheduler.isEnabled(context)) }
     var color by remember { mutableIntStateOf(ReminderScheduler.color(context)) }
+    var morningOn by remember { mutableStateOf(MorningBrief.isEnabled(context)) }
+    var morningHour by remember { mutableIntStateOf(MorningBrief.hour(context)) }
 
     val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         refresh++
@@ -200,6 +204,54 @@ fun RemindersScreen(onClose: () -> Unit, sample: () -> ReminderAlert) {
                     "para não teres o mesmo lembrete duas vezes.",
                 fontSize = 13.sp, color = Bento.Secondary, modifier = Modifier.padding(horizontal = 4.dp),
             )
+        }
+        Label("RESUMO DA MANHÃ")
+        Card {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Bubble(Icons.Rounded.WbSunny, Bento.Orange)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("O teu dia, logo de manhã", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                        Text(
+                            if (morningOn) "Todos os dias às ${morningHour}h: compromissos e aniversários" else "Desligado",
+                            fontSize = 13.sp, color = Bento.Secondary,
+                        )
+                    }
+                    Switch(
+                        checked = morningOn,
+                        onCheckedChange = { on ->
+                            morningOn = on
+                            Thread { MorningBrief.setEnabled(context.applicationContext, on) }.start()
+                        },
+                        colors = SwitchDefaults.colors(checkedTrackColor = Bento.Orange),
+                    )
+                }
+                if (morningOn) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        MorningBrief.hours.forEach { h ->
+                            val selected = h == morningHour
+                            Box(
+                                Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(50))
+                                    .background(if (selected) Bento.Orange else Bento.Ground)
+                                    .clickable {
+                                        morningHour = h
+                                        MorningBrief.setHour(context.applicationContext, h)
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "${h}h", fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                                    color = if (selected) Color.White else Bento.Ink,
+                                )
+                            }
+                        }
+                    }
+                    WideButton("Ver o resumo de hoje", Bento.Ground, Bento.Ink) {
+                        Thread { MorningBrief.post(context.applicationContext) }.start()
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
     }
