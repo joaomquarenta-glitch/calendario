@@ -158,8 +158,7 @@ object Subscriptions {
         put(CalendarContract.Events.HAS_ALARM, 0)
         if (e.rrule != null) {
             // Android wants a duration, not an end, for repeating events.
-            val seconds = maxOf(0L, (e.end.toEpochMilli() - e.start.toEpochMilli()) / 1000)
-            put(CalendarContract.Events.DURATION, if (e.allDay) "P${maxOf(1L, seconds / 86400)}D" else "P${seconds}S")
+            put(CalendarContract.Events.DURATION, EventRules.duration(e.end.toEpochMilli() - e.start.toEpochMilli(), e.allDay))
             put(CalendarContract.Events.RRULE, e.rrule)
             if (e.exdates.isNotEmpty()) put(CalendarContract.Events.EXDATE, e.exdates.joinToString(",") { utc.format(it) })
         } else {
