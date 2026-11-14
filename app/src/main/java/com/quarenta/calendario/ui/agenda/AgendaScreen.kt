@@ -190,7 +190,7 @@ fun AgendaScreen(
     FloatingActionButton(
         onClick = onNewEvent,
         containerColor = Bento.Blue,
-        contentColor = Color.White,
+        contentColor = Bento.OnBlue,
         shape = CircleShape,
         modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = LocalBars.current.calculateBottomPadding()).padding(20.dp).size(60.dp),
     ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", modifier = Modifier.size(30.dp)) }
@@ -423,7 +423,7 @@ private fun HighlightsPage(
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
-                Text("Agenda", style = MaterialTheme.typography.displaySmall, color = Bento.Ink)
+                Text("Agenda", style = MaterialTheme.typography.displaySmall)
             }
             IconButton(
                 onClick = onSearch,
@@ -432,7 +432,7 @@ private fun HighlightsPage(
             IconButton(
                 onClick = onNewEvent,
                 modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Blue),
-            ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", tint = Color.White) }
+            ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", tint = Bento.OnBlue) }
         }
         if (!hasCalendarAccess) Box(Modifier.padding(horizontal = 16.dp)) { AccessCard(onRequestAccess) }
 

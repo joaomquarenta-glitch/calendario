@@ -10,7 +10,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -25,13 +27,29 @@ data class AppTheme(
     val ground: Color,
     val tile: Color,
     val dark: Boolean = false,
+    /** Black and brushed gold, with glowing crystal edges on the tiles. */
+    val luxe: Boolean = false,
 )
 
 object Themes {
     val Light = AppTheme("light", "Claro", Color(0xFFF2F2F7), Color(0xFFFFFFFF))
     val Black = AppTheme("black", "Preto", Color(0xFF000000), Color(0xFF1C1C1E), dark = true)
+    val Gold = AppTheme("dourado", "Preto e dourado", Color(0xFF030303), Color(0xFF121110), dark = true, luxe = true)
     /** Follows the phone: Claro by day, Preto when the phone is in dark mode. */
     const val SYSTEM = "system"
+
+    /**
+     * The saved look. Black and gold became the app's main look in this version, so it is applied once
+     * to everyone; after that, whatever the person picks in Aparência stays.
+     */
+    fun load(prefs: android.content.SharedPreferences): String {
+        if (!prefs.getBoolean(KEY_GOLD_APPLIED, false)) {
+            prefs.edit().putString("theme", Gold.id).putBoolean(KEY_GOLD_APPLIED, true).apply()
+            return Gold.id
+        }
+        return prefs.getString("theme", Gold.id) ?: Gold.id
+    }
+    private const val KEY_GOLD_APPLIED = "theme_gold_applied"
 
     val pastels = listOf(
         AppTheme("rosa", "Rosa", Color(0xFFFADDE6), Color(0xFFFFF4F7)),
@@ -50,7 +68,7 @@ object Themes {
         AppTheme("perola", "Pérola", Color(0xFFE3E5EA), Color(0xFFF8F9FB)),
     )
 
-    fun byId(id: String?): AppTheme? = (listOf(Light, Black) + pastels).firstOrNull { it.id == id }
+    fun byId(id: String?): AppTheme? = (listOf(Gold, Light, Black) + pastels).firstOrNull { it.id == id }
 }
 
 /** The chosen look. Reading it inside the UI redraws the screens when it changes. */
@@ -62,17 +80,57 @@ object ThemeState {
         get() = Themes.byId(selectedId) ?: if (systemDark) Themes.Black else Themes.Light
 
     val isDark: Boolean get() = current.dark
+    val isLuxe: Boolean get() = current.luxe
+}
+
+/** The black-and-gold look: brushed, matte gold with bright crystal highlights. */
+object Gold {
+    val Bright = Color(0xFFFFE3A0)
+    val Main = Color(0xFFD9B45A)
+    val Deep = Color(0xFF8A6A2A)
+    val Matte = Color(0xFFB8975A)
+
+    /** The rim of a tile: light catching the facets of cut crystal as it goes round. */
+    val rim: Brush get() = Brush.linearGradient(
+        0f to Bright, 0.22f to Deep.copy(alpha = 0.55f), 0.5f to Main.copy(alpha = 0.9f),
+        0.78f to Deep.copy(alpha = 0.5f), 1f to Bright,
+    )
+
+    /** A matte black surface with a faint diagonal sheen, like anodised metal. */
+    val surface: Brush get() = Brush.linearGradient(
+        0f to Color(0xFF1A1813), 0.45f to Color(0xFF0E0D0B), 1f to Color(0xFF16140F),
+    )
+
+    /** Polished gold for filled buttons and big numbers. */
+    val metal: Brush get() = Brush.linearGradient(
+        0f to Bright, 0.35f to Main, 0.65f to Deep, 1f to Main,
+    )
 }
 
 /** Apple-style system colours used across the app (tiles, icons, accents). */
 object Bento {
     val Ground: Color get() = ThemeState.current.ground
     val Tile: Color get() = ThemeState.current.tile
-    val Ink: Color get() = if (ThemeState.isDark) Color(0xFFF5F5F7) else Color(0xFF1C1C1E)
-    val Secondary: Color get() = if (ThemeState.isDark) Color(0xFF98989F) else Color(0xFF5E5E66)
-    val Hairline: Color get() = if (ThemeState.isDark) Color(0xFF38383A) else Color(0x1F000000)
+    val Ink: Color get() = when {
+        ThemeState.isLuxe -> Color(0xFFF8F1E1)
+        ThemeState.isDark -> Color(0xFFF5F5F7)
+        else -> Color(0xFF1C1C1E)
+    }
+    val Secondary: Color get() = when {
+        ThemeState.isLuxe -> Color(0xFFADA28B)
+        ThemeState.isDark -> Color(0xFF98989F)
+        else -> Color(0xFF5E5E66)
+    }
+    val Hairline: Color get() = when {
+        ThemeState.isLuxe -> Gold.Main.copy(alpha = 0.28f)
+        ThemeState.isDark -> Color(0xFF38383A)
+        else -> Color(0x1F000000)
+    }
 
-    val Blue = Color(0xFF007AFF)
+    /** The main accent: blue, or gold in the black-and-gold look. */
+    val Blue: Color get() = if (ThemeState.isLuxe) Gold.Main else Color(0xFF007AFF)
+    /** Text and icons drawn on top of the main accent. */
+    val OnBlue: Color get() = if (ThemeState.isLuxe) Color(0xFF14110A) else Color.White
     val Green = Color(0xFF34C759)
     val Orange = Color(0xFFFF9500)
     val Red = Color(0xFFFF3B30)
@@ -83,7 +141,11 @@ object Bento {
     val Yellow = Color(0xFFFFCC00)
 
     /** Text shades that keep 4.5:1 contrast on the tiles, in light and dark looks. */
-    val BlueText: Color get() = if (ThemeState.isDark) Color(0xFF64A8FF) else Color(0xFF0062CC)
+    val BlueText: Color get() = when {
+        ThemeState.isLuxe -> Gold.Bright
+        ThemeState.isDark -> Color(0xFF64A8FF)
+        else -> Color(0xFF0062CC)
+    }
     val RedText: Color get() = if (ThemeState.isDark) Color(0xFFFF6961) else Color(0xFFD70015)
     val GreenText: Color get() = if (ThemeState.isDark) Color(0xFF4CD964) else Color(0xFF1B6E30)
 }
@@ -115,18 +177,25 @@ fun CalendarioTheme(content: @Composable () -> Unit) {
     val t = ThemeState.current
     val colors = if (t.dark) {
         darkColorScheme(
-            primary = Bento.Blue, onPrimary = Color.White,
+            primary = Bento.Blue, onPrimary = Bento.OnBlue,
             background = t.ground, surface = t.tile, surfaceVariant = t.tile,
             onSurface = Bento.Ink, onBackground = Bento.Ink, onSurfaceVariant = Bento.Secondary,
             secondary = Bento.Green, error = Bento.Red,
         )
     } else {
         lightColorScheme(
-            primary = Bento.Blue, onPrimary = Color.White,
+            primary = Bento.Blue, onPrimary = Bento.OnBlue,
             background = t.ground, surface = t.tile, surfaceVariant = t.tile,
             onSurface = Bento.Ink, onBackground = Bento.Ink, onSurfaceVariant = Bento.Secondary,
             secondary = Bento.Green, error = Bento.Red,
         )
     }
-    MaterialTheme(colorScheme = colors, typography = AppTypography, content = content)
+    // In black and gold the big page titles are polished gold with a soft neon halo.
+    val typography = if (t.luxe) AppTypography.copy(
+        displaySmall = AppTypography.displaySmall.copy(
+            brush = Gold.metal,
+            shadow = Shadow(color = Gold.Main.copy(alpha = 0.55f), blurRadius = 22f),
+        ),
+    ) else AppTypography.copy(displaySmall = AppTypography.displaySmall.copy(color = Bento.Ink))
+    MaterialTheme(colorScheme = colors, typography = typography, content = content)
 }

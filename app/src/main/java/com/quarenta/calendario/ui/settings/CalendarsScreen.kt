@@ -83,7 +83,7 @@ fun CalendarsScreen(
         IconButton(onClick = onClose, modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile)) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
         }
-        Text("Calendários", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+        Text("Calendários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
         Text(
             "Escolhe o que aparece na FortyCalendar. Os calendários ficam iguais nas outras apps.",
             fontSize = 15.sp, color = Bento.Secondary,

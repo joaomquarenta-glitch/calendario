@@ -111,7 +111,7 @@ fun HomeScreen(
         Row(Modifier.padding(start = 4.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
-                Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, color = Bento.Ink)
+                Text("${today.dayOfMonth} de ${monthLong(today)}", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
             }
             // Which of the phone's calendars show here.
             androidx.compose.material3.IconButton(
