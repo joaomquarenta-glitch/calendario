@@ -275,11 +275,24 @@ private fun App(vm: AppViewModel) {
         }
 
         // Full-screen sheets drawn over the tabs: everything stays inside this app.
-        val o = overlay
+        // The last sheet stays drawn while it slides away.
+        val lastOverlay = remember { arrayOfNulls<Overlay>(1) }
+        if (overlay != null) lastOverlay[0] = overlay
+        val o = overlay ?: lastOverlay[0]
+        val growsFromTile = (overlay as? Overlay.PersonCard)?.let { com.quarenta.calendario.ui.components.PhotoZoom.pending(it.person.id) } == true
+        androidx.compose.animation.AnimatedVisibility(
+            visible = overlay != null,
+            enter = if (growsFromTile) androidx.compose.animation.EnterTransition.None else
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.spring(stiffness = 600f)) +
+                    androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 500f)) { it / 5 },
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(160)) +
+                androidx.compose.animation.slideOutHorizontally(androidx.compose.animation.core.tween(220)) { it / 5 },
+        ) {
         if (o != null) Box(
             Modifier
                 .fillMaxSize()
-                .background(Bento.Ground)
+                // A person's card draws its own background, so its photo can grow from the tile underneath.
+                .then(if (o is Overlay.PersonCard) Modifier else Modifier.background(Bento.Ground))
                 // Registers as hit so taps never fall through to the tab underneath.
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
         ) { when (o) {
@@ -344,6 +357,7 @@ private fun App(vm: AppViewModel) {
                 onClose = vm::closeOverlay,
             )
         } }
+        }
     }
 }
 
