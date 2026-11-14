@@ -77,6 +77,7 @@ class CalendarRepository(private val context: Context) {
         )
 
         val events = mutableListOf<CalendarEvent>()
+        val hidden = CalendarChoice.hidden(context)
         resolver.query(
             uri, projection,
             "${CalendarContract.Instances.VISIBLE} = 1",
@@ -84,6 +85,7 @@ class CalendarRepository(private val context: Context) {
             "${CalendarContract.Instances.BEGIN} ASC",
         )?.use { c ->
             while (c.moveToNext()) {
+                if (c.getLong(8) in hidden) continue
                 val allDay = c.getInt(4) == 1
                 events += CalendarEvent(
                     id = c.getLong(0),
@@ -142,6 +144,33 @@ class CalendarRepository(private val context: Context) {
                 canEdit = c.getInt(11) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
             )
         }
+    }
+
+    /** Every calendar Android shows, read-only ones too (birthdays, holidays), to choose which this app shows. */
+    fun allCalendars(): List<CalendarInfo> {
+        val projection = arrayOf(
+            CalendarContract.Calendars._ID,
+            CalendarContract.Calendars.CALENDAR_DISPLAY_NAME,
+            CalendarContract.Calendars.ACCOUNT_NAME,
+            CalendarContract.Calendars.CALENDAR_COLOR,
+            CalendarContract.Calendars.IS_PRIMARY,
+        )
+        val out = mutableListOf<CalendarInfo>()
+        resolver.query(
+            CalendarContract.Calendars.CONTENT_URI, projection,
+            "${CalendarContract.Calendars.VISIBLE} = 1", null, null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                out += CalendarInfo(
+                    id = c.getLong(0),
+                    name = c.getString(1) ?: "",
+                    account = c.getString(2) ?: "",
+                    color = c.getInt(3),
+                    isPrimary = c.getInt(4) == 1,
+                )
+            }
+        }
+        return out
     }
 
     /** Calendars the person can add events to, primary first. */
