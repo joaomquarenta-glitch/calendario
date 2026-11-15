@@ -104,7 +104,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quarenta.calendario.data.CalendarEvent
 import com.quarenta.calendario.data.ContactsRepository
-import com.quarenta.calendario.data.Dedup
+import com.quarenta.calendario.data.PersonLinks
+import com.quarenta.calendario.data.Task
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EventAvailable
+import androidx.compose.material.icons.rounded.RadioButtonUnchecked
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextDecoration
 import com.quarenta.calendario.data.LabeledValue
 import com.quarenta.calendario.data.Person
 import com.quarenta.calendario.data.PersonDetails
@@ -126,17 +135,8 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /** Events that mention this person by full name (or first + last name) in the title or notes. */
-fun eventsWith(person: Person, events: List<CalendarEvent>): List<CalendarEvent> {
-    val tokens = Dedup.normalize(person.name).split(' ').filter { it.length >= 2 }
-    if (tokens.isEmpty()) return emptyList()
-    val full = tokens.joinToString(" ")
-    val firstLast = if (tokens.size >= 2) "${tokens.first()} ${tokens.last()}" else full
-    return events.filter { e ->
-        val text = " " + Dedup.normalize(e.title + " " + (e.description ?: "")) + " "
-        text.contains(" $full ") || text.contains(" $firstLast ") ||
-            (tokens.size >= 2 && text.contains(" ${tokens.first()} ") && text.contains(" ${tokens.last()} "))
-    }
-}
+fun eventsWith(person: Person, events: List<CalendarEvent>): List<CalendarEvent> =
+    events.filter { e -> PersonLinks.mentions(person.name, e.title + " " + (e.description ?: "")) }
 
 /** What the bottom half shows: the card, the list of things to add, or one editor. */
 private sealed interface Panel {
@@ -161,6 +161,11 @@ fun PersonScreen(
     onClose: () -> Unit,
     onPickPhoto: (Uri) -> Unit = {},
     onResetPhoto: () -> Unit = {},
+    tasks: List<Task> = emptyList(),
+    onToggleTask: (Task) -> Unit = {},
+    onAddTask: (String) -> Unit = {},
+    pastEvents: suspend () -> List<CalendarEvent> = { emptyList() },
+    onNewEventWith: () -> Unit = {},
 ) {
     var panel by remember(person.id) { mutableStateOf<Panel>(Panel.Card) }
     val context = LocalContext.current
@@ -259,6 +264,11 @@ fun PersonScreen(
 
     val now = Instant.now()
     val upcoming = eventsWith(person, events).filter { it.end.isAfter(now) }.take(5)
+    // The last time we were together: the most recent past appointment with them, up to a year back.
+    val lastSeen by produceState<CalendarEvent?>(null, person.id) {
+        value = runCatching { eventsWith(person, pastEvents()).filter { it.end.isBefore(now) }.maxByOrNull { it.start } }.getOrNull()
+    }
+    val personTasks = remember(person.name, tasks) { PersonLinks.tasksWith(person.name, tasks) }
 
     val ground = Bento.Ground
     BoxWithConstraints(
@@ -432,6 +442,33 @@ fun PersonScreen(
                         }
                     }
 
+                    lastSeen?.let { last ->
+                        val days = ChronoUnit.DAYS.between(last.start.localDate(), LocalDate.now())
+                        BentoTile(Modifier.fillMaxWidth(), onClick = { onOpenEvent(last) }) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                DateBadge(last.start.localDate(), last.composeColor())
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        "ÚLTIMA VEZ · ${PersonLinks.sinceText(days).uppercase()}",
+                                        fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary,
+                                    )
+                                    Text(last.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+
+                    // Book something with this person: a new appointment with their name already in it.
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Bento.Tile).clickable { onNewEventWith() }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.EventAvailable, contentDescription = null, tint = Bento.Blue)
+                        Spacer(Modifier.size(10.dp))
+                        Text("Marcar com ${firstName(person.name)}", color = Bento.BlueText, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         d?.birthday?.let { md ->
                             val today = LocalDate.now()
@@ -513,6 +550,10 @@ fun PersonScreen(
                             fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Bento.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
+
+                    PersonTasksCard(person, personTasks, onToggleTask, onAddTask)
+
+                    com.quarenta.calendario.ui.event.GiftIdeasCard(person)
 
                     // Notes the person writes freely; saved in this app.
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Pastels.Butter.first).padding(top = 14.dp)) {
@@ -636,4 +677,55 @@ private fun sharePerson(context: Context, person: Person, d: PersonDetails?) {
         }
     }
     open(context, Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, body), "Partilhar contacto"))
+}
+
+/** Tasks that mention this person: tick them here, or add one that already carries their name. */
+@Composable
+private fun PersonTasksCard(person: Person, tasks: List<Task>, onToggle: (Task) -> Unit, onAdd: (String) -> Unit) {
+    var draft by remember(person.id) { mutableStateOf("") }
+    val add = {
+        val title = PersonLinks.taskTitle(draft, person.name)
+        if (title.isNotEmpty()) onAdd(title)
+        draft = ""
+    }
+    BentoTile(Modifier.fillMaxWidth()) {
+        Text("TAREFAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Secondary, letterSpacing = 0.6.sp)
+        Text(
+            if (tasks.isEmpty()) "O que tens para fazer com ${firstName(person.name)}?"
+            else "${tasks.count { !it.done }} por fazer",
+            fontSize = 14.sp, color = Bento.Secondary,
+        )
+        tasks.forEach { t ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { onToggle(t) }) {
+                    Icon(
+                        if (t.done) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked,
+                        contentDescription = if (t.done) "Feita" else "Por fazer",
+                        tint = if (t.done) Bento.Green else Bento.Secondary,
+                    )
+                }
+                Text(
+                    t.title, fontSize = 16.sp, color = if (t.done) Bento.Secondary else Bento.Ink,
+                    textDecoration = if (t.done) TextDecoration.LineThrough else null,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                value = draft, onValueChange = { draft = it },
+                placeholder = { Text("Nova tarefa (devolver um livro...)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { add() }),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Bento.Ground, unfocusedContainerColor = Bento.Ground,
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = add) { Icon(Icons.Rounded.Add, contentDescription = "Juntar tarefa", tint = Bento.Blue) }
+        }
+    }
 }
