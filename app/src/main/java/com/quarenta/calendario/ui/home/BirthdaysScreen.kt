@@ -66,7 +66,7 @@ fun BirthdaysScreen(
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
             }
         }
-        item { Text("Aniversários", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink) }
+        item { Text("Aniversários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall) }
         if (entries.isEmpty()) {
             item {
                 BentoTile(Modifier.fillMaxWidth()) {

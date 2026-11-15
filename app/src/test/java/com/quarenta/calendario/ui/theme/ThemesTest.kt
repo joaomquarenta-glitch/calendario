@@ -34,4 +34,17 @@ class ThemesTest {
         assertTrue(ThemeState.isDark)
         ThemeState.selectedId = Themes.SYSTEM
     }
+
+    @Test
+    fun goldIsDarkWithAGoldAccent() {
+        ThemeState.selectedId = Themes.Gold.id
+        assertEquals(Themes.Gold, ThemeState.current)
+        assertTrue(ThemeState.isDark)
+        assertTrue(ThemeState.isLuxe)
+        assertEquals(Gold.Main, Bento.Blue)
+        ThemeState.selectedId = "black"
+        assertTrue(!ThemeState.isLuxe)
+        assertEquals(androidx.compose.ui.graphics.Color(0xFF007AFF), Bento.Blue)
+        ThemeState.selectedId = Themes.SYSTEM
+    }
 }

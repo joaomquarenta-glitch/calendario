@@ -51,8 +51,16 @@ fun AppearanceScreen(selectedId: String, onSelect: (String) -> Unit, onClose: ()
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
             }
         }
-        Text("Aparência", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+        Text("Aparência", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
         Text("Escolhe as cores da app. Muda logo, e fica guardado.", fontSize = 15.sp, color = Bento.Secondary)
+
+        Label("PRINCIPAL")
+        Swatch(
+            name = Themes.Gold.name, selected = selectedId == Themes.Gold.id, modifier = Modifier.fillMaxWidth(),
+            ground = Brush.linearGradient(listOf(Themes.Gold.ground, Themes.Gold.ground)),
+            tile = Gold.surface, rim = Gold.rim,
+            caption = "Preto baço, dourado escovado e brilho de cristal",
+        ) { onSelect(Themes.Gold.id) }
 
         Label("CLARO E ESCURO")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -100,8 +108,10 @@ private fun Swatch(
     ground: Brush,
     tile: Brush,
     caption: String? = null,
+    rim: Brush? = null,
     onClick: () -> Unit,
 ) {
+    val tileMod = { m: Modifier -> if (rim != null) m.border(1.dp, rim, RoundedCornerShape(10.dp)) else m }
     Column(modifier.clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick)) {
         Box(
             Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(22.dp)).background(ground)
@@ -109,10 +119,10 @@ private fun Swatch(
                 .padding(10.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile))
+                Box(tileMod(Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile)))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile))
-                    Box(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile))
+                    Box(tileMod(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile)))
+                    Box(tileMod(Modifier.weight(1f).height(34.dp).clip(RoundedCornerShape(10.dp)).background(tile)))
                 }
             }
             if (selected) {

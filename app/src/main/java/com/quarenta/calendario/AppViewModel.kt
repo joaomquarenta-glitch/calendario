@@ -323,7 +323,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("forty", android.content.Context.MODE_PRIVATE)
 
     init {
-        ThemeState.selectedId = prefs.getString("theme", Themes.SYSTEM) ?: Themes.SYSTEM
+        ThemeState.selectedId = Themes.load(prefs)
     }
 
     /** Applies a look at once and remembers it for next time. */

@@ -90,7 +90,7 @@ class ReminderActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
         }
-        ThemeState.selectedId = getSharedPreferences("forty", MODE_PRIVATE).getString("theme", Themes.SYSTEM) ?: Themes.SYSTEM
+        ThemeState.selectedId = Themes.load(getSharedPreferences("forty", MODE_PRIVATE))
         ThemeState.systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         enableEdgeToEdge()

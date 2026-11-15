@@ -354,10 +354,10 @@ private fun <T> Chips(options: List<Pair<T, String>>, selected: T, onSelect: (T)
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (on) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color.White))
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(Bento.OnBlue))
                     Spacer(Modifier.size(6.dp))
                 }
-                Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (on) Color.White else Bento.Ink)
+                Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (on) Bento.OnBlue else Bento.Ink)
             }
         }
     }

@@ -97,7 +97,7 @@ fun RemindersScreen(onClose: () -> Unit, sample: () -> ReminderAlert) {
         IconButton(onClick = onClose, modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile)) {
             Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
         }
-        Text("Lembretes", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+        Text("Lembretes", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
         Text(
             "Em ecrã inteiro, com a foto da pessoa, para todos os calendários do telemóvel. " +
                 "Usa os avisos que já tens em cada compromisso.",
@@ -290,7 +290,7 @@ private fun Check(icon: ImageVector, title: String, why: String, ok: Boolean, fi
             Icon(Icons.Rounded.Check, contentDescription = "Ativo", tint = Bento.GreenText)
         } else {
             Text(
-                "Ativar", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                "Ativar", color = Bento.OnBlue, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                 modifier = Modifier.clip(RoundedCornerShape(50)).background(Bento.Blue).clickable(onClick = fix)
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             )

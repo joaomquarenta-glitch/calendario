@@ -66,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -101,7 +102,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Apply the saved colours before the first frame, so the app never flashes white.
-        ThemeState.selectedId = getSharedPreferences("forty", MODE_PRIVATE).getString("theme", Themes.SYSTEM) ?: Themes.SYSTEM
+        ThemeState.selectedId = Themes.load(getSharedPreferences("forty", MODE_PRIVATE))
         ThemeState.systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         enableEdgeToEdge()
@@ -209,7 +210,13 @@ private fun App(vm: AppViewModel) {
                 NavigationBar(
                     containerColor = Color.Transparent,
                     tonalElevation = 0.dp,
-                    modifier = Modifier.hazeChild(glass, com.quarenta.calendario.ui.components.glassStyle()),
+                    modifier = Modifier.hazeChild(glass, com.quarenta.calendario.ui.components.glassStyle())
+                        .then(
+                            // Black and gold: a thin line of light along the top of the tab bar.
+                            if (com.quarenta.calendario.ui.theme.ThemeState.isLuxe) Modifier.drawBehind {
+                                drawLine(com.quarenta.calendario.ui.theme.Gold.rim, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
+                            } else Modifier,
+                        ),
                 ) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
@@ -220,7 +227,7 @@ private fun App(vm: AppViewModel) {
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Bento.Blue,
                                 selectedTextColor = Bento.Blue,
-                                indicatorColor = Bento.Blue.copy(alpha = 0.12f),
+                                indicatorColor = Bento.Blue.copy(alpha = if (com.quarenta.calendario.ui.theme.ThemeState.isLuxe) 0.18f else 0.12f),
                                 unselectedIconColor = Bento.Secondary,
                                 unselectedTextColor = Bento.Secondary,
                             ),

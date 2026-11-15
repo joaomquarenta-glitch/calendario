@@ -20,16 +20,16 @@ import com.quarenta.calendario.ui.theme.Bento
 @Composable
 fun AccessCard(onRequestAccess: () -> Unit) {
     BentoTile(Modifier.fillMaxWidth(), color = Bento.Blue) {
-        Text("Juntar os teus calendários", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Juntar os teus calendários", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Bento.OnBlue)
         Text(
             "Dá acesso aos calendários do telemóvel (Google, Outlook, Samsung e outros) para os veres todos aqui.",
-            fontSize = 14.sp, color = Color.White,
+            fontSize = 14.sp, color = Bento.OnBlue,
         )
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = onRequestAccess,
             shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Bento.BlueText),
+            colors = ButtonDefaults.buttonColors(containerColor = Bento.OnBlue, contentColor = Bento.Blue),
             modifier = Modifier.fillMaxWidth().height(50.dp),
         ) { Text("Dar acesso", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
     }
