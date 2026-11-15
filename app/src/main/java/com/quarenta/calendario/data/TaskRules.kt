@@ -31,15 +31,15 @@ object TaskRules {
     }
 
     /**
-     * Ticking a task. A repeating one is not finished: it moves to its next day (never to a day
-     * already gone, so a task forgotten for a week comes back once, not seven times).
+     * Ticking a task. A repeating one is not finished: it moves to its next day after today (never
+     * to a day already gone or to today, so a task forgotten for a week comes back once, not seven times).
      */
     fun complete(task: Task, today: LocalDate): Task {
         if (task.done) return task.copy(done = false)
         val due = task.dueEpochDay?.let(LocalDate::ofEpochDay)
         if (task.repeat == null || due == null) return task.copy(done = true)
         var next = nextDue(due, task.repeat)
-        while (next.isBefore(today)) next = nextDue(next, task.repeat)
+        while (!next.isAfter(today)) next = nextDue(next, task.repeat)
         if (!next.isAfter(due)) return task.copy(done = true)
         return task.copy(dueEpochDay = next.toEpochDay())
     }
