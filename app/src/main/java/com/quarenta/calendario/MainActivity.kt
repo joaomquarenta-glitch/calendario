@@ -412,6 +412,11 @@ private fun App(vm: AppViewModel) {
                     onClose = vm::closeOverlay,
                     onPickPhoto = { uri -> vm.setPhoto(o.person, uri) },
                     onResetPhoto = { vm.resetPhoto(o.person) },
+                    tasks = tasks,
+                    onToggleTask = vm::toggleTask,
+                    onAddTask = { title -> vm.addTask(title, due = null) },
+                    pastEvents = vm::searchPool,
+                    onNewEventWith = { vm.newEvent(java.time.LocalDate.now(), title = "Com ${o.person.name}") },
                 )
             }
             is Overlay.PhotoTarget -> com.quarenta.calendario.ui.bento.PhotoTargetScreen(

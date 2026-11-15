@@ -508,12 +508,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .also { searchPool = it }
     }
 
-    fun newEvent(date: LocalDate = _selectedDate.value) {
+    fun newEvent(date: LocalDate = _selectedDate.value, title: String = "") {
         val zone = java.time.ZoneId.systemDefault()
         val now = java.time.LocalTime.now()
         val hour = if (date == LocalDate.now()) (now.hour + 1).coerceAtMost(23) else 9
         val start = date.atTime(hour, 0).atZone(zone).toInstant()
-        push(Overlay.Editor(EventDraft(start = start, end = start.plusSeconds(3600))))
+        push(Overlay.Editor(EventDraft(title = title, start = start, end = start.plusSeconds(3600))))
     }
 
     fun editEvent(event: CalendarEvent) {
