@@ -46,10 +46,11 @@ fun BentoTile(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(26.dp)
+    val haptic = rememberHaptics()
     Column(
         modifier = modifier
             .then(if (ThemeState.isLuxe) Modifier.luxe(shape, plain = color == Bento.Tile, tint = color) else Modifier.clip(shape).background(color))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable { haptic(Touch.Tick); onClick() } else Modifier)
             .padding(16.dp),
         content = content,
     )

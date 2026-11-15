@@ -7,8 +7,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.remember
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -244,10 +242,10 @@ private fun PhotoTile(person: Person, label: String, onLongClick: () -> Unit, on
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Modifier.holdable(onClick: () -> Unit, onLongClick: () -> Unit): Modifier {
-    val haptics = LocalHapticFeedback.current
+    val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
     return combinedClickable(
         onClick = onClick,
-        onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() },
+        onLongClick = { haptic(com.quarenta.calendario.ui.components.Touch.Long); onLongClick() },
     )
 }
 
