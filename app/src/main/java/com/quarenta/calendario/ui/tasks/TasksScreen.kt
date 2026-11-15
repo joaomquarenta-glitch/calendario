@@ -40,6 +40,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.quarenta.calendario.data.Task
+import com.quarenta.calendario.data.TaskRules
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
 import com.quarenta.calendario.ui.agenda.TaskCheck
 import com.quarenta.calendario.ui.components.SectionLabel
 import com.quarenta.calendario.ui.dayHeading
@@ -52,6 +55,8 @@ fun TasksScreen(
     onAdd: (String) -> Unit,
     onToggle: (Task) -> Unit,
     onDelete: (Task) -> Unit,
+    steps: Map<Long, List<Task>> = emptyMap(),
+    onOpen: (Task) -> Unit = {},
 ) {
     var draft by rememberSaveable { mutableStateOf("") }
     val submit = { onAdd(draft); draft = "" }
@@ -110,20 +115,27 @@ fun TasksScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(20.dp))
                         .background(Bento.Tile)
-                        .clickable { onToggle(task) }
-                        .padding(start = 16.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+                        .clickable { onOpen(task) }
+                        .padding(start = 4.dp, top = 2.dp, bottom = 2.dp, end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    TaskCheck(task.done)
-                    Column(Modifier.weight(1f)) {
+                    Box(Modifier.clip(CircleShape).clickable { onToggle(task) }.padding(12.dp)) { TaskCheck(task.done) }
+                    Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
                         Text(
                             task.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                             textDecoration = if (task.done) TextDecoration.LineThrough else null,
                             color = if (task.done) Bento.Secondary else Bento.Ink,
                         )
-                        task.dueEpochDay?.let {
-                            Text(dayHeading(LocalDate.ofEpochDay(it)), fontSize = 12.sp, color = Bento.Secondary)
+                        val details = listOfNotNull(
+                            task.dueEpochDay?.let { dayHeading(LocalDate.ofEpochDay(it)) },
+                            task.timeMinutes?.let { TaskRules.timeText(it) },
+                            task.remindBefore?.let { "🔔" },
+                            TaskRules.repeatLabel(task.repeat),
+                            TaskRules.progress(steps[task.id].orEmpty())?.let { "$it passos" },
+                        )
+                        if (details.isNotEmpty()) {
+                            Text(details.joinToString(" · "), fontSize = 12.sp, color = Bento.Secondary)
                         }
                     }
                     IconButton(onClick = { onDelete(task) }) {

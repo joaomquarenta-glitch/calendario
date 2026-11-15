@@ -16,6 +16,7 @@ class ReminderSystemReceiver : BroadcastReceiver() {
             try {
                 runCatching { ReminderScheduler.reschedule(context.applicationContext) }
                 runCatching { MorningBrief.schedule(context.applicationContext) }
+                runCatching { TaskReminders.syncFromDatabase(context.applicationContext) }
                 // The same changes can move the next event on the home-screen widget.
                 runCatching { com.quarenta.calendario.widget.NextWidget.refresh(context.applicationContext) }
             } finally { pending.finish() }
