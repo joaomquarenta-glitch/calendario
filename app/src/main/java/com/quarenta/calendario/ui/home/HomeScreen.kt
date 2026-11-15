@@ -10,6 +10,8 @@ import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Brush
@@ -89,6 +91,8 @@ fun HomeScreen(
     onOpenBirthdays: () -> Unit = {},
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
+    onQuickAdd: (String) -> Unit = {},
+    onQuickTask: (String) -> Unit = {},
 ) {
     val today = LocalDate.now()
     val nowMs = System.currentTimeMillis()
@@ -143,6 +147,8 @@ fun HomeScreen(
                 )
             }
         }
+
+        QuickAddBar(onQuickAdd, onQuickTask)
 
         if (!hasCalendarAccess) AccessCard(onRequestAccess)
 
@@ -330,4 +336,78 @@ private fun MiniMonth(today: LocalDate, events: List<CalendarEvent>) {
         }
     }
     Spacer(Modifier.width(0.dp))
+}
+
+/**
+ * Write or say it the way you would to someone ("Jantar com a Ana sexta 20h"), then make it an
+ * appointment (the editor opens already filled in) or a task for today.
+ */
+@Composable
+private fun QuickAddBar(onEvent: (String) -> Unit, onTask: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var text by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf("") }
+    val voice = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val heard = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (!heard.isNullOrBlank()) text = heard.replaceFirstChar { it.uppercase() }
+    }
+    val listen = {
+        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "pt-PT")
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Diz o que queres marcar")
+        if (runCatching { voice.launch(intent) }.isFailure) {
+            android.widget.Toast.makeText(context, "Este telemóvel não tem reconhecimento de voz", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    val send = { if (text.isNotBlank()) { onEvent(text); text = "" } }
+    BentoTile(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.TextField(
+                value = text, onValueChange = { text = it },
+                placeholder = { Text("Jantar com a Ana sexta 20h", color = Bento.Secondary) },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { send() }),
+                colors = androidx.compose.material3.TextFieldDefaults.colors(
+                    focusedContainerColor = Bento.Ground, unfocusedContainerColor = Bento.Ground,
+                    focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Bento.Ink),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            androidx.compose.material3.IconButton(
+                onClick = listen,
+                modifier = Modifier.size(52.dp).clip(CircleShape).background(Bento.Blue),
+            ) {
+                androidx.compose.material3.Icon(
+                    androidx.compose.material.icons.Icons.Rounded.Mic, contentDescription = "Falar", tint = Bento.OnBlue,
+                )
+            }
+        }
+        if (text.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                QuickChoice("Marcar compromisso", primary = true, Modifier.weight(1f), send)
+                QuickChoice("Juntar como tarefa", primary = false, Modifier.weight(1f)) { onTask(text); text = "" }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickChoice(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier.clip(RoundedCornerShape(16.dp)).background(if (primary) Bento.Blue else Bento.Ground)
+            .clickable(onClick = onClick).padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (primary) Bento.OnBlue else Bento.BlueText)
+    }
 }

@@ -56,6 +56,8 @@ sealed interface Overlay {
         val fromOtherApp: Boolean = false,
         /** The occurrence being edited, so a repeating one can change alone. */
         val event: CalendarEvent? = null,
+        /** Words from the quick add on Início, understood in the editor. */
+        val quick: String = "",
     ) : Overlay
     data class PersonCard(val person: Person) : Overlay
     data object Appearance : Overlay
@@ -521,6 +523,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         runCatching { Dedup.merge(calendars.eventsBetween(today.minusYears(1), today.plusYears(2))) }
             .getOrDefault(emptyList())
             .also { searchPool = it }
+    }
+
+    /** From Início: what was typed or said ("Jantar com a Ana sexta 20h") opens a new appointment, filled in. */
+    fun quickAdd(text: String) {
+        if (text.isBlank()) return
+        val zone = java.time.ZoneId.systemDefault()
+        val start = LocalDate.now().atTime((java.time.LocalTime.now().hour + 1).coerceAtMost(23), 0).atZone(zone).toInstant()
+        push(Overlay.Editor(EventDraft(start = start, end = start.plusSeconds(3600)), quick = text.trim()))
     }
 
     fun newEvent(date: LocalDate = _selectedDate.value, title: String = "") {

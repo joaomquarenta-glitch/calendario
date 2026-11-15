@@ -276,6 +276,8 @@ private fun App(vm: AppViewModel) {
                         onOpenBirthdays = vm::openBirthdays,
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
+                        onQuickAdd = vm::quickAdd,
+                        onQuickTask = { vm.addTask(it) },
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -367,6 +369,7 @@ private fun App(vm: AppViewModel) {
                 onCancel = vm::closeOverlay,
                 onSave = { draft -> vm.save(draft, o.editingId) },
                 existingRepeat = o.event?.let { com.quarenta.calendario.data.Repeat.of(it.rrule) },
+                initialQuick = o.quick,
             )
             Overlay.Appearance -> AppearanceScreen(
                 selectedId = ThemeState.selectedId,
