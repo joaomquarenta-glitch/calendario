@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.agenda
 
+import com.quarenta.calendario.ui.event.icon
 import android.graphics.Bitmap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
@@ -159,7 +160,7 @@ private fun HighlightCard(
                         Text(initials, color = Color.White, fontSize = 60.sp, fontWeight = FontWeight.ExtraBold)
                     } else {
                         Icon(
-                            if (birthday) Icons.Rounded.Cake else Icons.Rounded.CalendarMonth,
+                            if (birthday) Icons.Rounded.Cake else com.quarenta.calendario.data.EventKinds.of(event.title, event.sources).icon(),
                             contentDescription = null, tint = Color.White, modifier = Modifier.size(76.dp),
                         )
                     }

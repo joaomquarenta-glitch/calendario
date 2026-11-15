@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -137,7 +138,9 @@ fun EventDetailScreen(
         } else {
             // No photo: the event's colour with its title.
             Column(
-                Modifier.fillMaxWidth().background(color).statusBarsPadding().padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
+                Modifier.fillMaxWidth()
+                    .background(Brush.linearGradient(listOf(lerp(color, Color.White, 0.18f), color, lerp(color, Color.Black, 0.35f))))
+                    .statusBarsPadding().padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     RoundIcon(Icons.Rounded.ArrowBack, "Voltar", onClose)
@@ -151,7 +154,14 @@ fun EventDetailScreen(
                         else dayHeading(day),
                         color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                     )
-                    Text(event.title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 34.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val kind = com.quarenta.calendario.data.EventKinds.of(event.title, event.sources)
+                        Box(
+                            Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(alpha = 0.22f)),
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(kind.icon(), contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp)) }
+                        Text(event.title, color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 34.sp, modifier = Modifier.weight(1f))
+                    }
                     if (!event.allDay) Text(event.timeRange(), color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -185,6 +195,8 @@ fun EventDetailScreen(
                 accent = color,
                 onSave = onSavePlan,
             )
+            val place = (plan?.place?.takeIf { it.isNotBlank() } ?: event.location).orEmpty().trim()
+            if (place.isNotEmpty()) MiniMap(place, color)
             event.description?.let { notes ->
                 BentoTile(Modifier.fillMaxWidth()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
