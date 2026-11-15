@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
         vm.refresh()
         vm.refreshPeople()
         vm.checkForUpdate()
+        vm.refreshWeather()
     }
 }
 
@@ -157,6 +158,10 @@ private fun App(vm: AppViewModel) {
         permission.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
     }
     val requestContacts = { permission.launch(arrayOf(Manifest.permission.READ_CONTACTS)) }
+    val weather by vm.weather.collectAsStateWithLifecycle()
+    val weatherAsk by vm.weatherAsk.collectAsStateWithLifecycle()
+    // Only a rough position (about a town's size) is asked for: enough for the forecast.
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.refreshWeather() }
 
     // Reminders need notifications (Android 13+ asks). Ask once, when the calendar is already shared.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -291,6 +296,10 @@ private fun App(vm: AppViewModel) {
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
                         onSearch = vm::openSearch,
+                        weather = weather,
+                        weatherAsk = weatherAsk,
+                        onAllowWeather = { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+                        onDeclineWeather = vm::declineWeather,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
@@ -359,6 +368,7 @@ private fun App(vm: AppViewModel) {
                     plan = plan,
                     onSavePlan = vm::savePlan,
                     phoneFor = vm::phoneFor,
+                    weatherFor = vm::weatherFor,
                 )
             }
             is Overlay.Editor -> EventEditorScreen(

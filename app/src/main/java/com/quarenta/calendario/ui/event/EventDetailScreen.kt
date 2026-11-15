@@ -95,6 +95,7 @@ fun EventDetailScreen(
     plan: EventPlan? = null,
     onSavePlan: (EventPlan) -> Unit = {},
     phoneFor: suspend (Person) -> String? = { null },
+    weatherFor: suspend (CalendarEvent) -> com.quarenta.calendario.data.DayWeather? = { null },
 ) {
     BackHandler(onBack = onClose)
     val context = LocalContext.current
@@ -177,6 +178,8 @@ fun EventDetailScreen(
                 )
                 GiftIdeasCard(person)
             }
+            val forecast by produceState<com.quarenta.calendario.data.DayWeather?>(null, event.id, event.location) { value = weatherFor(event) }
+            forecast?.let { WeatherCard(it) }
             PlanCard(
                 key = Highlights.planKey(event.id, day),
                 title = if (birthday) "A FESTA" else "O PLANO",
@@ -338,4 +341,21 @@ fun shareEvent(context: Context, event: CalendarEvent) {
     }
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, body)
     context.startActivity(Intent.createChooser(send, "Partilhar compromisso"))
+}
+
+/** The forecast for the day of the appointment, with a word of warning when it will rain. */
+@Composable
+private fun WeatherCard(w: com.quarenta.calendario.data.DayWeather) {
+    BentoTile(Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(w.symbol, fontSize = 36.sp)
+            Column(Modifier.weight(1f)) {
+                Text("PREVISÃO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary)
+                Text("${w.label} · ${w.range}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                if (com.quarenta.calendario.data.Weather.isWet(w.code)) {
+                    Text("Leva guarda-chuva, e se for na esplanada pensa num plano B.", fontSize = 13.sp, color = Bento.Secondary)
+                }
+            }
+        }
+    }
 }
