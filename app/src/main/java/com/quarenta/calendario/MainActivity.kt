@@ -136,6 +136,7 @@ private fun App(vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     val events by vm.events.collectAsStateWithLifecycle()
     val tasks by vm.tasks.collectAsStateWithLifecycle()
+    val allTasks by vm.allTasks.collectAsStateWithLifecycle()
     val hasAccess by vm.hasCalendarAccess.collectAsStateWithLifecycle()
     val hasContacts by vm.hasContactsAccess.collectAsStateWithLifecycle()
     val people by vm.people.collectAsStateWithLifecycle()
@@ -298,9 +299,11 @@ private fun App(vm: AppViewModel) {
                     )
                     Tab.Tasks -> TasksScreen(
                         tasks = tasks,
+                        steps = allTasks.filter { it.parentId != null }.groupBy { it.parentId!! },
                         onAdd = { vm.addTask(it) },
                         onToggle = vm::toggleTask,
                         onDelete = vm::deleteTask,
+                        onOpen = vm::openTask,
                     )
                 }
               }
@@ -389,6 +392,24 @@ private fun App(vm: AppViewModel) {
                 onOpenEvent = vm::openEvent,
                 onClose = vm::closeOverlay,
             )
+            is Overlay.TaskEditor -> {
+                val task = allTasks.firstOrNull { it.id == o.taskId }
+                if (task == null) {
+                    // Deleted (here or from its notification): nothing left to edit.
+                    LaunchedEffect(o.taskId) { vm.closeOverlay() }
+                } else {
+                    com.quarenta.calendario.ui.tasks.TaskEditorScreen(
+                        task = task,
+                        steps = allTasks.filter { it.parentId == task.id },
+                        onSave = vm::saveTask,
+                        onToggleStep = vm::toggleTask,
+                        onAddStep = { vm.addStep(task, it) },
+                        onDeleteStep = vm::deleteTask,
+                        onDelete = { vm.deleteTask(task); vm.closeOverlay() },
+                        onClose = vm::closeOverlay,
+                    )
+                }
+            }
             Overlay.Birthdays -> com.quarenta.calendario.ui.home.BirthdaysScreen(
                 entries = birthdays, people = people,
                 onOpenPerson = vm::openPerson, onClose = vm::closeOverlay,

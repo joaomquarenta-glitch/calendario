@@ -23,6 +23,14 @@ data class Task(
     val dueEpochDay: Long? = null,
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    /** Time of day in minutes after midnight, or null for "any time that day". */
+    val timeMinutes: Int? = null,
+    /** Remind this many minutes before (0 = at the time), or null for no reminder. */
+    val remindBefore: Int? = null,
+    /** How it repeats: one of [TaskRules.repeats] ids, or null for once. */
+    val repeat: String? = null,
+    /** For a step of a bigger task: the task it belongs to. */
+    val parentId: Long? = null,
 )
 
 @Dao
@@ -36,8 +44,17 @@ interface TaskDao {
     @Update
     suspend fun update(task: Task)
 
-    @Query("DELETE FROM tasks WHERE id = :id")
+    @Query("DELETE FROM tasks WHERE id = :id OR parentId = :id")
     suspend fun delete(id: Long)
+
+    @Query("SELECT * FROM tasks")
+    suspend fun all(): List<Task>
+
+    @Query("SELECT * FROM tasks WHERE id = :id")
+    suspend fun get(id: Long): Task?
+
+    @Query("UPDATE tasks SET done = 0 WHERE parentId = :parentId")
+    suspend fun reopenSteps(parentId: Long)
 }
 
 /**
@@ -63,7 +80,7 @@ interface EventPlanDao {
     suspend fun save(plan: EventPlan)
 }
 
-@Database(entities = [Task::class, PersonNote::class, PersonField::class, EventPlan::class], version = 3, exportSchema = false)
+@Database(entities = [Task::class, PersonNote::class, PersonField::class, EventPlan::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun tasks(): TaskDao
     abstract fun people(): PersonDao
@@ -94,11 +111,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 gives tasks a time, a reminder, a repeat and steps; existing tasks are kept as they are. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `tasks` ADD COLUMN `timeMinutes` INTEGER")
+                db.execSQL("ALTER TABLE `tasks` ADD COLUMN `remindBefore` INTEGER")
+                db.execSQL("ALTER TABLE `tasks` ADD COLUMN `repeat` TEXT")
+                db.execSQL("ALTER TABLE `tasks` ADD COLUMN `parentId` INTEGER")
+            }
+        }
+
         @Volatile private var instance: AppDatabase? = null
 
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "calendario.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { instance = it }
         }
     }

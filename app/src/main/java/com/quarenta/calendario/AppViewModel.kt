@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,6 +64,7 @@ sealed interface Overlay {
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
     data object Search : Overlay
     data object Birthdays : Overlay
+    data class TaskEditor(val taskId: Long) : Overlay
     data class Calendars(val prefillUrl: String? = null) : Overlay
 }
 
@@ -111,8 +113,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    val tasks: StateFlow<List<Task>> = taskDao.observeAll()
+    /** Every task, steps included. */
+    val allTasks: StateFlow<List<Task>> = taskDao.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** The tasks shown in lists: steps stay inside their task. */
+    val tasks: StateFlow<List<Task>> = allTasks
+        .map { all -> all.filter { it.parentId == null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        // Keep one alarm per task reminder, whatever changed the tasks.
+        viewModelScope.launch(Dispatchers.IO) {
+            taskDao.observeAll().collect { runCatching { com.quarenta.calendario.reminders.TaskReminders.sync(app, it) } }
+        }
+    }
 
     /** Reload whenever any calendar on the phone changes (new sync, edit elsewhere). */
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -604,9 +619,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { taskDao.insert(Task(title = title.trim(), dueEpochDay = due?.toEpochDay())) }
     }
 
+    /** Ticks a task; a repeating one moves to its next day with its steps undone. */
     fun toggleTask(task: Task) {
-        viewModelScope.launch { taskDao.update(task.copy(done = !task.done)) }
+        viewModelScope.launch {
+            val updated = com.quarenta.calendario.data.TaskRules.complete(task, LocalDate.now())
+            taskDao.update(updated)
+            if (updated.dueEpochDay != task.dueEpochDay) taskDao.reopenSteps(task.id)
+            if (updated.done) com.quarenta.calendario.reminders.TaskReminders.dismiss(getApplication(), task.id)
+        }
     }
+
+    fun saveTask(task: Task) {
+        if (task.title.isBlank()) return
+        viewModelScope.launch { taskDao.update(task.copy(title = task.title.trim())) }
+    }
+
+    fun addStep(parent: Task, title: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch { taskDao.insert(Task(title = title.trim(), parentId = parent.id)) }
+    }
+
+    fun openTask(task: Task) = push(Overlay.TaskEditor(task.id))
 
     fun deleteTask(task: Task) {
         viewModelScope.launch { taskDao.delete(task.id) }

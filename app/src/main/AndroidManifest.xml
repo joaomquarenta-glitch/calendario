@@ -114,6 +114,11 @@
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />
 
+        <!-- Task reminders and their "Feita" button -->
+        <receiver
+            android:name=".reminders.TaskReminderReceiver"
+            android:exported="false" />
+
         <!-- The morning summary of the day ahead -->
         <receiver
             android:name=".reminders.MorningReceiver"
