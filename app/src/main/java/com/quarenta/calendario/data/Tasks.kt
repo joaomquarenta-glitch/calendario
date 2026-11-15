@@ -123,6 +123,17 @@ abstract class AppDatabase : RoomDatabase() {
 
         @Volatile private var instance: AppDatabase? = null
 
+        /** Writes everything waiting in the journal into the main file, so a copy of it is complete. */
+        fun checkpoint(context: Context) {
+            get(context).openHelper.writableDatabase.query("PRAGMA wal_checkpoint(FULL)").use { it.moveToFirst() }
+        }
+
+        /** Closes the database before a restore replaces its file. */
+        fun closeForRestore() = synchronized(this) {
+            instance?.close()
+            instance = null
+        }
+
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "calendario.db")
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

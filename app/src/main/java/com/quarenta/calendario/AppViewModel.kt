@@ -66,6 +66,7 @@ sealed interface Overlay {
     data class PhotoTarget(val uri: android.net.Uri) : Overlay
     data object Search : Overlay
     data object Birthdays : Overlay
+    data object Backup : Overlay
     data class TaskEditor(val taskId: Long) : Overlay
     data class Calendars(val prefillUrl: String? = null) : Overlay
 }
@@ -240,6 +241,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openBirthdays() = push(Overlay.Birthdays)
+    fun openBackup() = push(Overlay.Backup)
 
     /** The person's mobile number (for WhatsApp), or any number they have. */
     suspend fun phoneFor(person: Person): String? = withContext(Dispatchers.IO) {
