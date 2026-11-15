@@ -38,6 +38,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,6 +79,8 @@ fun EventEditorScreen(
     onSave: (EventDraft) -> Unit,
     /** How the edited appointment repeats now; null for a new one. */
     existingRepeat: Repeat? = null,
+    /** Words typed or spoken on Início, understood here as if written in "Escreve como dirias". */
+    initialQuick: String = "",
 ) {
     BackHandler(onBack = onCancel)
     val zone = ZoneId.systemDefault()
@@ -136,18 +139,10 @@ fun EventEditorScreen(
 
             if (isNew && !fromOtherApp) {
                 // Write it the way you'd say it; the title, day and time below fill themselves in.
-                var quick by remember { mutableStateOf("") }
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Bento.Blue.copy(alpha = 0.10f)).padding(top = 12.dp)) {
-                    Text(
-                        "ESCREVE COMO DIRIAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.BlueText,
-                        letterSpacing = 0.6.sp, modifier = Modifier.padding(horizontal = 16.dp),
-                    )
-                    TextField(
-                        value = quick,
-                        onValueChange = { text ->
-                            quick = text
-                            val r = QuickAdd.parse(text, LocalDateTime.now(zone))
-                            draft = when {
+                var quick by remember { mutableStateOf(initialQuick) }
+                fun understand(text: String) {
+                    val r = QuickAdd.parse(text, LocalDateTime.now(zone))
+                    draft = when {
                                 !r.foundWhen -> draft.copy(title = r.title, start = initial.start, end = initial.end, allDay = initial.allDay)
                                 r.allDay -> {
                                     val day = r.date.atStartOfDay(zone).toInstant()
@@ -159,6 +154,18 @@ fun EventEditorScreen(
                                     draft.copy(title = r.title, allDay = false, start = begin, end = finish)
                                 }
                             }
+                }
+                LaunchedEffect(Unit) { if (initialQuick.isNotBlank()) understand(initialQuick) }
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(Bento.Blue.copy(alpha = 0.10f)).padding(top = 12.dp)) {
+                    Text(
+                        "ESCREVE COMO DIRIAS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Bento.BlueText,
+                        letterSpacing = 0.6.sp, modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                    TextField(
+                        value = quick,
+                        onValueChange = { text ->
+                            quick = text
+                            understand(text)
                         },
                         placeholder = { Text("Jantar com a Ana sexta 20h") },
                         singleLine = true,
