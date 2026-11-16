@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- Checking GitHub for a newer version and installing it over this one -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Reminders: on time, full screen, and still there after the phone restarts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

@@ -345,6 +345,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         ThemeState.selectedId = Themes.load(prefs)
     }
 
+    // The forecast for the next days where the phone roughly is, beside each day of the agenda.
+    private val _weather = MutableStateFlow<Map<LocalDate, com.quarenta.calendario.data.DayWeather>>(emptyMap())
+    val weather: StateFlow<Map<LocalDate, com.quarenta.calendario.data.DayWeather>> = _weather.asStateFlow()
+
+    /** True while the agenda should offer to show the weather: no permission yet, and not turned down. */
+    private val _weatherAsk = MutableStateFlow(false)
+    val weatherAsk: StateFlow<Boolean> = _weatherAsk.asStateFlow()
+
+    fun refreshWeather() {
+        val app = getApplication<Application>()
+        _weatherAsk.value = !com.quarenta.calendario.data.WeatherSource.hasPermission(app) && !prefs.getBoolean("weather_declined", false)
+        viewModelScope.launch {
+            val days = withContext(Dispatchers.IO) { com.quarenta.calendario.data.WeatherSource.home(app) }
+            if (days.isNotEmpty()) _weather.value = days
+        }
+    }
+
+    fun declineWeather() {
+        prefs.edit().putBoolean("weather_declined", true).apply()
+        _weatherAsk.value = false
+    }
+
+    /** The forecast for an event's day, at its place when the place can be found. Null beyond the forecast. */
+    suspend fun weatherFor(event: CalendarEvent): com.quarenta.calendario.data.DayWeather? {
+        val app = getApplication<Application>()
+        val day = event.start.atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        if (day.isBefore(LocalDate.now()) || day.isAfter(LocalDate.now().plusDays(com.quarenta.calendario.data.Weather.DAYS - 1L))) return null
+        return withContext(Dispatchers.IO) { com.quarenta.calendario.data.WeatherSource.at(app, event.location)[day] }
+    }
+
     /** Applies a look at once and remembers it for next time. */
     fun setTheme(id: String) {
         ThemeState.selectedId = id
