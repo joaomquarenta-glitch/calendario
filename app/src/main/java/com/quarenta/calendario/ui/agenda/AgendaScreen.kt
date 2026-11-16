@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.quarenta.calendario.ui.event.icon
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.rememberScrollState
@@ -337,12 +338,19 @@ private fun EventCard(event: CalendarEvent, isToday: Boolean, onClick: () -> Uni
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Bento.Tile)
+            // The calendar's colour glows in from the left and fades into the card.
+            .background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    0f to color.copy(alpha = 0.26f), 0.55f to color.copy(alpha = 0.06f), 1f to androidx.compose.ui.graphics.Color.Transparent,
+                ),
+            )
             .clickable(onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            IconTile(Icons.Rounded.CalendarMonth, color, 52.dp, 28.dp)
+            val kind = remember(event.title, event.sources) { com.quarenta.calendario.data.EventKinds.of(event.title, event.sources) }
+            IconTile(kind.icon(), color, 52.dp, 28.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 val soon = if (isToday) startsIn(event) else null
                 Text(
