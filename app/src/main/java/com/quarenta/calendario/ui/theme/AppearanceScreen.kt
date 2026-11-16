@@ -90,6 +90,36 @@ fun AppearanceScreen(selectedId: String, onSelect: (String) -> Unit, onClose: ()
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
+
+        Label("TOQUE")
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
+        val on = com.quarenta.calendario.ui.components.Haptics.enabled
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Bento.Tile)
+                .clickable {
+                    com.quarenta.calendario.ui.components.Haptics.setEnabled(context, !on)
+                    haptic(com.quarenta.calendario.ui.components.Touch.Confirm)
+                }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Vibrar ao tocar", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Bento.Ink)
+                Text("Um toque leve ao abrir, e outro diferente ao concluir ou apagar", fontSize = 12.sp, color = Bento.Secondary)
+            }
+            androidx.compose.material3.Switch(
+                checked = on,
+                onCheckedChange = {
+                    com.quarenta.calendario.ui.components.Haptics.setEnabled(context, it)
+                    haptic(com.quarenta.calendario.ui.components.Touch.Confirm)
+                },
+                colors = androidx.compose.material3.SwitchDefaults.colors(
+                    checkedThumbColor = Bento.OnBlue,
+                    checkedTrackColor = Bento.Blue,
+                ),
+            )
+        }
         Spacer(Modifier.height(16.dp))
     }
 }
@@ -112,7 +142,8 @@ private fun Swatch(
     onClick: () -> Unit,
 ) {
     val tileMod = { m: Modifier -> if (rim != null) m.border(1.dp, rim, RoundedCornerShape(10.dp)) else m }
-    Column(modifier.clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick)) {
+    val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
+    Column(modifier.clip(RoundedCornerShape(22.dp)).clickable { haptic(com.quarenta.calendario.ui.components.Touch.Tick); onClick() }) {
         Box(
             Modifier.fillMaxWidth().height(112.dp).clip(RoundedCornerShape(22.dp)).background(ground)
                 .border(if (selected) 3.dp else 1.dp, if (selected) Bento.Blue else Bento.Hairline, RoundedCornerShape(22.dp))
