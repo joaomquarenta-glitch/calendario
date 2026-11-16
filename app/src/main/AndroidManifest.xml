@@ -156,6 +156,43 @@
                 android:resource="@xml/widget_next_info" />
         </receiver>
 
+        <!-- More widgets: tasks to tick, the month, and a person with the next plan together -->
+        <receiver
+            android:name=".widget.TasksWidget"
+            android:exported="false"
+            android:label="Tarefas">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_tasks_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MonthWidget"
+            android:exported="false"
+            android:label="Mês">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_month_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.PersonWidget"
+            android:exported="false"
+            android:label="Com quem">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_person_info" />
+        </receiver>
+
         <!-- Refreshes subscribed calendar links in the background -->
         <service
             android:name=".data.SubscriptionJob"

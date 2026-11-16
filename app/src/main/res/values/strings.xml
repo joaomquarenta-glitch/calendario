@@ -3,4 +3,7 @@
     <string name="widget_next_label">PRÓXIMO</string>
     <string name="widget_next_empty">Sem compromissos</string>
     <string name="widget_next_description">O próximo compromisso, com a foto da pessoa</string>
+    <string name="widget_tasks_description">As tarefas de hoje, para marcar sem abrir a app</string>
+    <string name="widget_month_description">Este mês, com os dias ocupados</string>
+    <string name="widget_person_description">A foto de uma pessoa e o próximo compromisso com ela</string>
 </resources>

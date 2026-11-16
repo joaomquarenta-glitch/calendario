@@ -341,6 +341,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         ThemeState.selectedId = Themes.load(prefs)
+        // Any change to the tasks, here or from the widget, redraws the tasks widget.
+        viewModelScope.launch { taskDao.observeAll().collect { com.quarenta.calendario.widget.TasksWidget.refresh(app) } }
     }
 
     /** Applies a look at once and remembers it for next time. */
@@ -600,7 +602,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun messageShown() { _message.value = null }
 
     /** Handles "Add to calendar" buttons and .ics files sent by other apps. */
+    private val _tabRequest = MutableStateFlow<String?>(null)
+    val tabRequest: StateFlow<String?> = _tabRequest.asStateFlow()
+    fun tabShown() { _tabRequest.value = null }
+
     fun handleIntent(intent: Intent?) {
+        intent?.getStringExtra(MainActivity.EXTRA_TAB)?.let { tab ->
+            intent.removeExtra(MainActivity.EXTRA_TAB)
+            stack.clear()
+            _overlay.value = null
+            _tabRequest.value = tab
+            return
+        }
         val scheme = intent?.data?.scheme?.lowercase()
         if (intent?.action == Intent.ACTION_VIEW && (scheme == "webcal" || scheme == "webcals")) {
             replaceAll(Overlay.Calendars(prefillUrl = intent.data.toString()))
