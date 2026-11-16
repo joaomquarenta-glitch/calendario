@@ -64,6 +64,8 @@ android {
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Screen tests run on the JVM with Robolectric, so CI needs no emulator.
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
@@ -92,4 +94,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")
+    // Screen (interface) tests: real Compose screens, clicked and read on the JVM.
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
