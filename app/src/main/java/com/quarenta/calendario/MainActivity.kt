@@ -278,6 +278,7 @@ private fun App(vm: AppViewModel) {
                         birthYearFor = vm::birthYearFor,
                         onQuickAdd = vm::quickAdd,
                         onQuickTask = { vm.addTask(it) },
+                        onOpenBackup = vm::openBackup,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -413,6 +414,7 @@ private fun App(vm: AppViewModel) {
                     )
                 }
             }
+            Overlay.Backup -> com.quarenta.calendario.ui.settings.BackupScreen(onClose = vm::closeOverlay)
             Overlay.Birthdays -> com.quarenta.calendario.ui.home.BirthdaysScreen(
                 entries = birthdays, people = people,
                 onOpenPerson = vm::openPerson, onClose = vm::closeOverlay,
