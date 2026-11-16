@@ -100,6 +100,11 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
 
+    companion object {
+        /** A widget asks to open on a tab: "agenda" or "tasks". */
+        const val EXTRA_TAB = "forty_tab"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Apply the saved colours before the first frame, so the app never flashes white.
@@ -126,6 +131,8 @@ class MainActivity : ComponentActivity() {
         val app = applicationContext
         Thread { runCatching { ReminderScheduler.reschedule(app) } }.start()
         com.quarenta.calendario.widget.NextWidget.refresh(app)
+        com.quarenta.calendario.widget.MonthWidget.refresh(app)
+        com.quarenta.calendario.widget.PersonWidget.refresh(app)
         vm.refresh()
         vm.refreshPeople()
         vm.checkForUpdate()
@@ -137,6 +144,15 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun App(vm: AppViewModel) {
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
+    // A widget can ask for a tab (the month opens the Agenda, the tasks open Tarefas).
+    val tabRequest by vm.tabRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(tabRequest) {
+        when (tabRequest) {
+            "agenda" -> tab = Tab.Agenda
+            "tasks" -> tab = Tab.Tasks
+        }
+        if (tabRequest != null) vm.tabShown()
+    }
     // A small vibration on the touches that matter: done feels different from deleted.
     val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
     val toggleTask: (com.quarenta.calendario.data.Task) -> Unit = { t ->

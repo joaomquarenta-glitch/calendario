@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Month widget: one sharp picture of the month on the black card. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_dark"
+    android:clipToOutline="true"
+    android:padding="8dp"
+    tools:targetApi="31">
+
+    <ImageView
+        android:id="@+id/month_picture"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Este mês"
+        android:scaleType="fitCenter" />
+</FrameLayout>
