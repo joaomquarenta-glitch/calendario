@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.quarenta.calendario.ui.event.icon
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.rememberScrollState
@@ -107,6 +108,10 @@ fun AgendaScreen(
     photoFor: suspend (Person) -> Bitmap? = { null },
     birthYearFor: suspend (Person) -> Int? = { null },
     onSearch: () -> Unit = {},
+    weather: Map<LocalDate, com.quarenta.calendario.data.DayWeather> = emptyMap(),
+    weatherAsk: Boolean = false,
+    onAllowWeather: () -> Unit = {},
+    onDeclineWeather: () -> Unit = {},
 ) {
     // First the big cards; "Ver todos os compromissos" opens the full list.
     var showAll by rememberSaveable { mutableStateOf(false) }
@@ -170,6 +175,7 @@ fun AgendaScreen(
         }
         item { WeekStrip(today, selectedDate, byDay, onSelectDate) }
         if (!hasCalendarAccess) item { AccessCard(onRequestAccess) }
+        if (weatherAsk) item { WeatherAskCard(onAllowWeather, onDeclineWeather) }
 
         items(rows, key = { row ->
             when (row) {
@@ -180,7 +186,15 @@ fun AgendaScreen(
             }
         }) { row ->
             when (row) {
-                is AgendaRow.Header -> SectionLabel(dayHeading(row.date, today))
+                is AgendaRow.Header -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    SectionLabel(dayHeading(row.date, today), Modifier.weight(1f))
+                    weather[row.date]?.let { w ->
+                        Text(
+                            w.short, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary,
+                            modifier = Modifier.padding(end = 6.dp, bottom = 2.dp),
+                        )
+                    }
+                }
                 is AgendaRow.Empty -> Text("Dia livre", modifier = Modifier.padding(start = 4.dp), color = Bento.Secondary, fontSize = 14.sp)
                 is AgendaRow.Event -> EventCard(row.event, row.date == today) { onOpenEvent(row.event) }
                 is AgendaRow.TaskRow -> TaskCard(row.task) { onToggleTask(row.task) }
@@ -194,6 +208,24 @@ fun AgendaScreen(
         shape = CircleShape,
         modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = LocalBars.current.calculateBottomPadding()).padding(20.dp).size(60.dp),
     ) { Icon(Icons.Rounded.Add, contentDescription = "Novo compromisso", modifier = Modifier.size(30.dp)) }
+    }
+}
+
+/** Offers, once, to show the weather beside each day. "Agora não" hides it for good. */
+@Composable
+private fun WeatherAskCard(onAllow: () -> Unit, onDecline: () -> Unit) {
+    com.quarenta.calendario.ui.components.BentoTile(Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("⛅", fontSize = 34.sp)
+            Column(Modifier.weight(1f)) {
+                Text("Ver o tempo de cada dia", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                Text("Só a zona aproximada onde estás, para a previsão.", fontSize = 13.sp, color = Bento.Secondary)
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onDecline) { Text("Agora não", color = Bento.Secondary) }
+            TextButton(onClick = onAllow) { Text("Mostrar", fontWeight = FontWeight.Bold, color = Bento.BlueText) }
+        }
     }
 }
 
@@ -337,12 +369,19 @@ private fun EventCard(event: CalendarEvent, isToday: Boolean, onClick: () -> Uni
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Bento.Tile)
+            // The calendar's colour glows in from the left and fades into the card.
+            .background(
+                androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    0f to color.copy(alpha = 0.26f), 0.55f to color.copy(alpha = 0.06f), 1f to androidx.compose.ui.graphics.Color.Transparent,
+                ),
+            )
             .clickable(onClick = onClick)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            IconTile(Icons.Rounded.CalendarMonth, color, 52.dp, 28.dp)
+            val kind = remember(event.title, event.sources) { com.quarenta.calendario.data.EventKinds.of(event.title, event.sources) }
+            IconTile(kind.icon(), color, 52.dp, 28.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 val soon = if (isToday) startsIn(event) else null
                 Text(

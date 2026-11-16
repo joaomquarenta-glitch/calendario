@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.CloudUpload
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Brush
@@ -65,6 +66,7 @@ import com.quarenta.calendario.ui.bento.Avatar
 import com.quarenta.calendario.ui.components.BentoTile
 import com.quarenta.calendario.ui.components.IconTile
 import com.quarenta.calendario.ui.composeColor
+import com.quarenta.calendario.ui.monthShort
 import com.quarenta.calendario.ui.days
 import com.quarenta.calendario.ui.localTime
 import com.quarenta.calendario.ui.monthLong
@@ -93,8 +95,10 @@ fun HomeScreen(
     birthYearFor: suspend (Person) -> Int? = { null },
     onQuickAdd: (String) -> Unit = {},
     onQuickTask: (String) -> Unit = {},
+    onOpenBackup: () -> Unit = {},
 ) {
     val today = LocalDate.now()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val nowMs = System.currentTimeMillis()
     val next = remember(events) {
         Highlights.upcoming(events, nowMs, endMs = { it.end.toEpochMilli() }, startMs = { it.start.toEpochMilli() }, max = 1).firstOrNull()
@@ -204,6 +208,21 @@ fun HomeScreen(
                         }
                     }
                     Text("${people.size}", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
+                }
+            }
+        }
+
+        // Keep everything safe: one file with tasks, notes, photos and settings.
+        BentoTile(Modifier.fillMaxWidth(), onClick = onOpenBackup) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                IconTile(androidx.compose.material.icons.Icons.Rounded.CloudUpload, Bento.Teal)
+                Column(Modifier.weight(1f)) {
+                    Text("Cópia de segurança", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                    val last = remember { com.quarenta.calendario.data.Backup.lastBackup(context) }
+                    Text(
+                        last?.let { "Última: ${it.dayOfMonth} ${monthShort(it)}" } ?: "Guarda tudo num ficheiro",
+                        fontSize = 13.sp, color = Bento.Secondary,
+                    )
                 }
             }
         }

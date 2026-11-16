@@ -86,6 +86,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.quarenta.calendario.ui.theme.CalendarioTheme
+import androidx.compose.animation.togetherWith
 import com.quarenta.calendario.ui.settings.RemindersScreen
 import com.quarenta.calendario.reminders.ReminderScheduler
 
@@ -108,6 +109,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Apply the saved colours before the first frame, so the app never flashes white.
         ThemeState.selectedId = Themes.load(getSharedPreferences("forty", MODE_PRIVATE))
+        com.quarenta.calendario.ui.components.Haptics.load(getSharedPreferences("forty", MODE_PRIVATE))
         ThemeState.systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
             android.content.res.Configuration.UI_MODE_NIGHT_YES
         enableEdgeToEdge()
@@ -134,6 +136,7 @@ class MainActivity : ComponentActivity() {
         vm.refresh()
         vm.refreshPeople()
         vm.checkForUpdate()
+        vm.refreshWeather()
     }
 }
 
@@ -149,6 +152,16 @@ private fun App(vm: AppViewModel) {
             "tasks" -> tab = Tab.Tasks
         }
         if (tabRequest != null) vm.tabShown()
+    }
+    // A small vibration on the touches that matter: done feels different from deleted.
+    val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
+    val toggleTask: (com.quarenta.calendario.data.Task) -> Unit = { t ->
+        haptic(if (t.done) com.quarenta.calendario.ui.components.Touch.Tick else com.quarenta.calendario.ui.components.Touch.Confirm)
+        vm.toggleTask(t)
+    }
+    val deleteTask: (com.quarenta.calendario.data.Task) -> Unit = { t ->
+        haptic(com.quarenta.calendario.ui.components.Touch.Reject)
+        vm.deleteTask(t)
     }
     val events by vm.events.collectAsStateWithLifecycle()
     val tasks by vm.tasks.collectAsStateWithLifecycle()
@@ -173,6 +186,10 @@ private fun App(vm: AppViewModel) {
         permission.launch(arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR))
     }
     val requestContacts = { permission.launch(arrayOf(Manifest.permission.READ_CONTACTS)) }
+    val weather by vm.weather.collectAsStateWithLifecycle()
+    val weatherAsk by vm.weatherAsk.collectAsStateWithLifecycle()
+    // Only a rough position (about a town's size) is asked for: enough for the forecast.
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { vm.refreshWeather() }
 
     // Reminders need notifications (Android 13+ asks). Ask once, when the calendar is already shared.
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -238,7 +255,7 @@ private fun App(vm: AppViewModel) {
                     Tab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
-                            onClick = { tab = t },
+                            onClick = { if (tab != t) haptic(com.quarenta.calendario.ui.components.Touch.Tick); tab = t },
                             icon = { Icon(t.icon, contentDescription = null) },
                             label = { Text(t.label) },
                             colors = NavigationBarItemDefaults.colors(
@@ -275,7 +292,23 @@ private fun App(vm: AppViewModel) {
                     )
                 },
               ) {
-                when (tab) {
+                // Tabs glide sideways: forward slides in from the right, back from the left.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        val dir = com.quarenta.calendario.ui.components.TabMotion.direction(initialState.ordinal, targetState.ordinal)
+                        val slide = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.9f, stiffness = 520f)
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 40)) +
+                            androidx.compose.animation.slideInHorizontally(slide) { w -> com.quarenta.calendario.ui.components.TabMotion.offset(w, dir) })
+                            .togetherWith(
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) +
+                                    androidx.compose.animation.slideOutHorizontally(slide) { w -> -com.quarenta.calendario.ui.components.TabMotion.offset(w, dir) },
+                            )
+                    },
+                    label = "tabs",
+                ) { shown ->
+                when (shown) {
                     Tab.Home -> HomeScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
                         onRequestAccess = requestCalendar,
@@ -294,35 +327,41 @@ private fun App(vm: AppViewModel) {
                         birthYearFor = vm::birthYearFor,
                         onQuickAdd = vm::quickAdd,
                         onQuickTask = { vm.addTask(it) },
+                        onOpenBackup = vm::openBackup,
                     )
                     Tab.Agenda -> AgendaScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
                         onRequestAccess = requestCalendar,
-                        onToggleTask = vm::toggleTask,
+                        onToggleTask = toggleTask,
                         selectedDate = selectedDate,
-                        onSelectDate = vm::selectDate,
+                        onSelectDate = { d -> haptic(com.quarenta.calendario.ui.components.Touch.Tick); vm.selectDate(d) },
                         onOpenEvent = vm::openEvent,
                         onNewEvent = { vm.newEvent() },
                         people = people,
                         photoFor = vm::photoFor,
                         birthYearFor = vm::birthYearFor,
                         onSearch = vm::openSearch,
+                        weather = weather,
+                        weatherAsk = weatherAsk,
+                        onAllowWeather = { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
+                        onDeclineWeather = vm::declineWeather,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
                         hasContactsAccess = hasContacts,
                         onRequestAccess = requestContacts,
                         onOpenPerson = vm::openPerson,
-                        onDeletePerson = { p -> withWriteAccess { vm.deletePerson(p) } },
+                        onDeletePerson = { p -> haptic(com.quarenta.calendario.ui.components.Touch.Reject); withWriteAccess { vm.deletePerson(p) } },
                     )
                     Tab.Tasks -> TasksScreen(
                         tasks = tasks,
                         steps = allTasks.filter { it.parentId != null }.groupBy { it.parentId!! },
                         onAdd = { vm.addTask(it) },
-                        onToggle = vm::toggleTask,
-                        onDelete = vm::deleteTask,
+                        onToggle = toggleTask,
+                        onDelete = deleteTask,
                         onOpen = vm::openTask,
                     )
+                }
                 }
               }
             }
@@ -368,13 +407,14 @@ private fun App(vm: AppViewModel) {
                     event = o.event,
                     onClose = vm::closeOverlay,
                     onEdit = { vm.editEvent(o.event) },
-                    onDelete = { onlyThis -> vm.delete(o.event, onlyThis) },
+                    onDelete = { onlyThis -> haptic(com.quarenta.calendario.ui.components.Touch.Reject); vm.delete(o.event, onlyThis) },
                     person = person,
                     photoFor = vm::photoFor,
                     birthYearFor = vm::birthYearFor,
                     plan = plan,
                     onSavePlan = vm::savePlan,
                     phoneFor = vm::phoneFor,
+                    weatherFor = vm::weatherFor,
                 )
             }
             is Overlay.Editor -> EventEditorScreen(
@@ -383,7 +423,7 @@ private fun App(vm: AppViewModel) {
                 fromOtherApp = o.fromOtherApp,
                 calendars = writable,
                 onCancel = vm::closeOverlay,
-                onSave = { draft -> vm.save(draft, o.editingId) },
+                onSave = { draft -> haptic(com.quarenta.calendario.ui.components.Touch.Confirm); vm.save(draft, o.editingId) },
                 existingRepeat = o.event?.let { com.quarenta.calendario.data.Repeat.of(it.rrule) },
                 initialQuick = o.quick,
             )
@@ -421,14 +461,15 @@ private fun App(vm: AppViewModel) {
                         task = task,
                         steps = allTasks.filter { it.parentId == task.id },
                         onSave = vm::saveTask,
-                        onToggleStep = vm::toggleTask,
+                        onToggleStep = toggleTask,
                         onAddStep = { vm.addStep(task, it) },
-                        onDeleteStep = vm::deleteTask,
-                        onDelete = { vm.deleteTask(task); vm.closeOverlay() },
+                        onDeleteStep = deleteTask,
+                        onDelete = { deleteTask(task); vm.closeOverlay() },
                         onClose = vm::closeOverlay,
                     )
                 }
             }
+            Overlay.Backup -> com.quarenta.calendario.ui.settings.BackupScreen(onClose = vm::closeOverlay)
             Overlay.Birthdays -> com.quarenta.calendario.ui.home.BirthdaysScreen(
                 entries = birthdays, people = people,
                 onOpenPerson = vm::openPerson, onClose = vm::closeOverlay,
@@ -453,7 +494,7 @@ private fun App(vm: AppViewModel) {
                     onPickPhoto = { uri -> vm.setPhoto(o.person, uri) },
                     onResetPhoto = { vm.resetPhoto(o.person) },
                     tasks = tasks,
-                    onToggleTask = vm::toggleTask,
+                    onToggleTask = toggleTask,
                     onAddTask = { title -> vm.addTask(title, due = null) },
                     pastEvents = vm::searchPool,
                     onNewEventWith = { vm.newEvent(java.time.LocalDate.now(), title = "Com ${o.person.name}") },
