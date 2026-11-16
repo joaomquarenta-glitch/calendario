@@ -86,6 +86,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.quarenta.calendario.ui.theme.CalendarioTheme
+import androidx.compose.animation.togetherWith
 import com.quarenta.calendario.ui.settings.RemindersScreen
 import com.quarenta.calendario.reminders.ReminderScheduler
 
@@ -270,7 +271,23 @@ private fun App(vm: AppViewModel) {
                     )
                 },
               ) {
-                when (tab) {
+                // Tabs glide sideways: forward slides in from the right, back from the left.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        val dir = com.quarenta.calendario.ui.components.TabMotion.direction(initialState.ordinal, targetState.ordinal)
+                        val slide = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(dampingRatio = 0.9f, stiffness = 520f)
+                        (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 40)) +
+                            androidx.compose.animation.slideInHorizontally(slide) { w -> com.quarenta.calendario.ui.components.TabMotion.offset(w, dir) })
+                            .togetherWith(
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(140)) +
+                                    androidx.compose.animation.slideOutHorizontally(slide) { w -> -com.quarenta.calendario.ui.components.TabMotion.offset(w, dir) },
+                            )
+                    },
+                    label = "tabs",
+                ) { shown ->
+                when (shown) {
                     Tab.Home -> HomeScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
                         onRequestAccess = requestCalendar,
@@ -319,6 +336,7 @@ private fun App(vm: AppViewModel) {
                         onDelete = deleteTask,
                         onOpen = vm::openTask,
                     )
+                }
                 }
               }
             }
