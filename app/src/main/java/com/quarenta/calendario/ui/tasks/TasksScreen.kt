@@ -105,7 +105,7 @@ fun TasksScreen(
             }
         }
         if (groups.isEmpty()) {
-            item { Text("Ainda não há tarefas. Escreve a primeira acima.", color = Bento.Secondary, modifier = Modifier.padding(4.dp)) }
+            item { com.quarenta.calendario.ui.components.EmptyState(com.quarenta.calendario.ui.components.EmptyArt.NoTasks, "Tudo feito", "Ainda não há tarefas. Escreve a primeira acima.") }
         }
         groups.forEach { (label, list) ->
             item(key = "g$label") { SectionLabel(label) }

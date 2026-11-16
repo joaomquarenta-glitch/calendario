@@ -95,7 +95,7 @@ fun SearchScreen(
                 CircularProgressIndicator(color = Bento.Blue)
             }
             query.isBlank() -> Hint("Escreve uma palavra do título, do local ou das notas.\nProcura no último ano e nos próximos dois.")
-            result.isEmpty -> Hint("Nada encontrado para “${query.trim()}”.")
+            result.isEmpty -> com.quarenta.calendario.ui.components.EmptyState(com.quarenta.calendario.ui.components.EmptyArt.NoResults, "Nada encontrado", "Não há compromissos com “${query.trim()}”.")
             else -> LazyColumn(
                 Modifier.fillMaxSize().navigationBarsPadding(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp),
