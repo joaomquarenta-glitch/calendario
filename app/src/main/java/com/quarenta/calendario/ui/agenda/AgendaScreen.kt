@@ -46,6 +46,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.rounded.ViewAgenda
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.ViewCarousel
 import android.graphics.Bitmap
 import com.quarenta.calendario.data.Person
@@ -112,6 +113,8 @@ fun AgendaScreen(
     weatherAsk: Boolean = false,
     onAllowWeather: () -> Unit = {},
     onDeclineWeather: () -> Unit = {},
+    onMoveEvent: (CalendarEvent, Int) -> Unit = { _, _ -> },
+    onNewAt: (LocalDate, java.time.LocalTime) -> Unit = { _, _ -> },
 ) {
     // First the big cards; "Ver todos os compromissos" opens the full list.
     var showAll by rememberSaveable { mutableStateOf(false) }
@@ -128,7 +131,22 @@ fun AgendaScreen(
     val context = LocalContext.current
     val today = LocalDate.now()
     val listState = rememberLazyListState()
-    LaunchedEffect(selectedDate) { listState.scrollToItem(0) }
+    // The list of days, or one day hour by hour.
+    var hours by rememberSaveable { mutableStateOf(false) }
+    // Where the hour-by-hour day sits in the list: title, week, then the optional cards.
+    val timelineIndex = 3 + (if (!hasCalendarAccess) 1 else 0) + (if (weatherAsk) 1 else 0)
+    val hourPx = with(androidx.compose.ui.platform.LocalDensity.current) { HourHeight.roundToPx() }
+    LaunchedEffect(selectedDate, hours) {
+        if (!hours) { listState.scrollToItem(0); return@LaunchedEffect }
+        // Open the day around now (today) or the first appointment, a little before it.
+        val first = events.filter { !it.allDay && selectedDate in it.days() }.minOfOrNull { it.start }
+        val hour = when {
+            selectedDate == today -> java.time.LocalTime.now().hour
+            first != null -> first.atZone(java.time.ZoneId.systemDefault()).let { if (it.toLocalDate() == selectedDate) it.hour else 0 }
+            else -> 8
+        }
+        listState.scrollToItem(timelineIndex, ((hour - 1).coerceAtLeast(0)) * hourPx)
+    }
     val byDay = events.flatMap { e -> e.days().map { it to e } }.groupBy({ it.first }, { it.second })
     val tasksByDay = tasks.filter { it.dueEpochDay != null }.groupBy { LocalDate.ofEpochDay(it.dueEpochDay!!) }
 
@@ -162,6 +180,12 @@ fun AgendaScreen(
                 IconButton(onClick = onSearch) {
                     Icon(Icons.Rounded.Search, contentDescription = "Procurar compromissos", tint = Bento.Blue)
                 }
+                IconButton(onClick = { hours = !hours }) {
+                    Icon(
+                        if (hours) Icons.Rounded.ViewAgenda else Icons.Rounded.Schedule,
+                        contentDescription = if (hours) "Ver lista de dias" else "Ver o dia por horas", tint = Bento.Blue,
+                    )
+                }
                 IconButton(onClick = { showAll = false }) {
                     Icon(Icons.Rounded.ViewCarousel, contentDescription = "Ver em destaque", tint = Bento.Blue)
                 }
@@ -176,6 +200,31 @@ fun AgendaScreen(
         item { WeekStrip(today, selectedDate, byDay, onSelectDate) }
         if (!hasCalendarAccess) item { AccessCard(onRequestAccess) }
         if (weatherAsk) item { WeatherAskCard(onAllowWeather, onDeclineWeather) }
+
+        if (hours) {
+            item(key = "timeline-head") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    SectionLabel(dayHeading(selectedDate, today), Modifier.weight(1f))
+                    weather[selectedDate]?.let { Text(it.short, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary, modifier = Modifier.padding(end = 6.dp, bottom = 2.dp)) }
+                }
+            }
+            item(key = "timeline") {
+                DayTimeline(
+                    day = selectedDate,
+                    events = byDay[selectedDate].orEmpty(),
+                    onOpenEvent = onOpenEvent,
+                    onMoveEvent = onMoveEvent,
+                    onNewAt = { t -> onNewAt(selectedDate, t) },
+                )
+            }
+            item(key = "timeline-hint") {
+                Text(
+                    "Toca numa hora vazia para marcar. Carrega sem largar num compromisso e arrasta para mudar a hora.",
+                    fontSize = 13.sp, color = Bento.Secondary, modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+            return@LazyColumn
+        }
 
         items(rows, key = { row ->
             when (row) {

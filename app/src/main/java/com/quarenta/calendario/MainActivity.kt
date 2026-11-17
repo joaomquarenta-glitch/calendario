@@ -388,6 +388,8 @@ private fun App(vm: AppViewModel) {
                         weatherAsk = weatherAsk,
                         onAllowWeather = { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
                         onDeclineWeather = vm::declineWeather,
+                        onMoveEvent = { e, minutes -> haptic(com.quarenta.calendario.ui.components.Touch.Confirm); vm.moveEvent(e, minutes) },
+                        onNewAt = vm::newEventAt,
                     )
                     Tab.People -> BentoScreen(
                         people = people,

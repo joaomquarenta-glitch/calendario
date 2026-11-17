@@ -572,6 +572,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         push(Overlay.Editor(EventDraft(title = title, start = start, end = start.plusSeconds(3600))))
     }
 
+    /** Dragged on the hour-by-hour day: the appointment moves by [minutes], same length. */
+    fun moveEvent(event: CalendarEvent, minutes: Int) {
+        if (minutes == 0) return
+        val shift = minutes * 60_000L
+        val moved = event.copy(start = event.start.plusMillis(shift), end = event.end.plusMillis(shift))
+        _events.value = _events.value.map { if (it.id == event.id && it.instanceBegin == event.instanceBegin) moved else it }
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { calendars.move(event, shift) }.getOrDefault(false) }
+            val time = moved.start.atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+            _message.value = if (ok) "\"${event.title}\" passou para as %02d:%02d".format(time.hour, time.minute)
+                else "Não foi possível mudar a hora"
+            refresh()
+            if (ok) withContext(Dispatchers.IO) { runCatching { com.quarenta.calendario.reminders.ReminderScheduler.reschedule(app) } }
+        }
+    }
+
+    /** A new appointment at a chosen time, from tapping an empty hour. */
+    fun newEventAt(date: LocalDate, time: java.time.LocalTime) {
+        val start = date.atTime(time).atZone(java.time.ZoneId.systemDefault()).toInstant()
+        push(Overlay.Editor(EventDraft(start = start, end = start.plusSeconds(3600))))
+    }
+
     fun editEvent(event: CalendarEvent) {
         push(Overlay.Editor(
             EventDraft(

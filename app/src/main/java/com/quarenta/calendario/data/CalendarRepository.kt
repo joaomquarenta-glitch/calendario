@@ -323,6 +323,30 @@ class CalendarRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Moves an appointment by [shiftMillis], keeping its length. For a repeating one only this
+     * occurrence moves (Android keeps it as an exception); the rest of the series stays put.
+     */
+    fun move(event: CalendarEvent, shiftMillis: Long): Boolean {
+        val start = event.start.toEpochMilli() + shiftMillis
+        val end = event.end.toEpochMilli() + shiftMillis
+        if (event.repeats) {
+            val values = ContentValues().apply {
+                put(CalendarContract.Events.ORIGINAL_INSTANCE_TIME, event.instanceBegin)
+                put(CalendarContract.Events.DTSTART, start)
+                put(CalendarContract.Events.DTEND, end)
+            }
+            val exceptionUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_EXCEPTION_URI, event.id)
+            return resolver.insert(exceptionUri, values) != null
+        }
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.DTSTART, start)
+            put(CalendarContract.Events.DTEND, end)
+        }
+        val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, event.id)
+        return resolver.update(uri, values, null, null) > 0
+    }
+
     /** Deletes the appointment, or with [onlyInstance] just that occurrence of a repeating one. */
     fun delete(eventId: Long, onlyInstance: Long? = null): Boolean {
         if (onlyInstance != null) {
