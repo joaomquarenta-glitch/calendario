@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import com.quarenta.calendario.data.Task
 import com.quarenta.calendario.ui.components.Adaptive
 import com.quarenta.calendario.ui.components.CenteredContent
