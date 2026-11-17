@@ -257,7 +257,7 @@ private fun DeletePersonDialog(person: Person, onConfirm: () -> Unit, onDismiss:
         title = { Text("Apagar ${person.name}?", textAlign = TextAlign.Center) },
         text = {
             Text(
-                "O contacto é apagado do telemóvel e das contas onde está guardado (Google, Samsung...). Não dá para desfazer.",
+                "O contacto é apagado do telemóvel e das contas onde está guardado (Google, Samsung...). Tem uns segundos para desfazer.",
                 textAlign = TextAlign.Center,
             )
         },
