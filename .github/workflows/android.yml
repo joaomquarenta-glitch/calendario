@@ -67,7 +67,8 @@ jobs:
         run: cp app/build/outputs/apk/release/app-release.apk FortyCalendar.apk
 
       - name: Show the APK size
-        run: echo "FortyCalendar.apk: $(du -k FortyCalendar.apk | cut -f1) KB" >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "FortyCalendar.apk: $(du -k FortyCalendar.apk | cut -f1) KB" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         with:
