@@ -226,6 +226,23 @@ fun HomeScreen(
                 }
             }
         }
+
+        // Something wrong? One tap writes a short technical report to send by email or WhatsApp.
+        BentoTile(
+            Modifier.fillMaxWidth(),
+            onClick = {
+                val crash = com.quarenta.calendario.data.CrashStore
+                crash.send(context, com.quarenta.calendario.data.CrashReport.manual(crash.header(context), crash.last(context)))
+            },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                IconTile(androidx.compose.material.icons.Icons.Rounded.BugReport, Bento.Orange)
+                Column(Modifier.weight(1f)) {
+                    Text("Relatar um problema", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                    Text("Envia um relatório por email ou WhatsApp", fontSize = 13.sp, color = Bento.Secondary)
+                }
+            }
+        }
     }
 }
 
