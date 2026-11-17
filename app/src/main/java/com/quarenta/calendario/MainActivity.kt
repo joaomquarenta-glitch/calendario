@@ -127,16 +127,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Reminders follow any change made while the app was closed.
-        val app = applicationContext
-        Thread { runCatching { ReminderScheduler.reschedule(app) } }.start()
-        com.quarenta.calendario.widget.NextWidget.refresh(app)
-        com.quarenta.calendario.widget.MonthWidget.refresh(app)
-        com.quarenta.calendario.widget.PersonWidget.refresh(app)
+        // What the screen shows comes first...
         vm.refresh()
         vm.refreshPeople()
-        vm.checkForUpdate()
-        vm.refreshWeather()
+        // ...and the rest waits until the first frame is on screen, so opening the app feels instant.
+        afterFirstFrame {
+            if (isFinishing || isDestroyed) return@afterFirstFrame
+            // Reminders follow any change made while the app was closed.
+            val app = applicationContext
+            Thread { runCatching { ReminderScheduler.reschedule(app) } }.start()
+            com.quarenta.calendario.widget.NextWidget.refresh(app)
+            com.quarenta.calendario.widget.MonthWidget.refresh(app)
+            com.quarenta.calendario.widget.PersonWidget.refresh(app)
+            vm.checkForUpdate()
+            vm.refreshWeather()
+        }
+    }
+
+    /** Runs [work] just after the next frame has been drawn. */
+    private fun afterFirstFrame(work: () -> Unit) {
+        android.view.Choreographer.getInstance().postFrameCallback { window.decorView.post(work) }
     }
 }
 
