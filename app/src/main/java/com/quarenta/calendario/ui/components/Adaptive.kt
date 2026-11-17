@@ -53,6 +53,7 @@ fun isWide(): Boolean = Adaptive.useRail(LocalConfiguration.current.screenWidthD
  * Keeps clear of a side camera cut-out or side buttons when the phone lies down.
  * [startHandled]: the rail on the left already keeps clear of that side.
  */
+@Composable
 fun Modifier.sideSafe(startHandled: Boolean = false): Modifier = windowInsetsPadding(
     WindowInsets.safeDrawing.only(if (startHandled) WindowInsetsSides.End else WindowInsetsSides.Horizontal),
 )
