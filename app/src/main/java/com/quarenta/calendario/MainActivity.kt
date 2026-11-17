@@ -261,6 +261,21 @@ private fun App(vm: AppViewModel) {
         vm.messageShown()
         snackbar.showSnackbar(text)
     }
+    // Just deleted something: "Desfazer" for a few seconds, then it is final.
+    val undo by vm.undo.collectAsStateWithLifecycle()
+    LaunchedEffect(undo) {
+        val item = undo ?: return@LaunchedEffect
+        snackbar.currentSnackbarData?.dismiss()
+        val answer = kotlinx.coroutines.withTimeoutOrNull(com.quarenta.calendario.data.UndoRules.WINDOW_MS) {
+            snackbar.showSnackbar(item.text, actionLabel = "Desfazer", duration = androidx.compose.material3.SnackbarDuration.Indefinite)
+        }
+        if (answer == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            haptic(com.quarenta.calendario.ui.components.Touch.Confirm)
+            vm.undo()
+        } else {
+            vm.finishUndo()
+        }
+    }
 
     // Frosted glass bars: the tabs scroll underneath the status bar and the tab bar.
     val glass = remember { dev.chrisbanes.haze.HazeState() }

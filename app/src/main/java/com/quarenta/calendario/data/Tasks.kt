@@ -47,6 +47,10 @@ interface TaskDao {
     @Query("DELETE FROM tasks WHERE id = :id OR parentId = :id")
     suspend fun delete(id: Long)
 
+    /** Puts deleted tasks back exactly as they were, ids included ("Desfazer"). */
+    @Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
+    suspend fun restore(tasks: List<Task>)
+
     @Query("SELECT * FROM tasks")
     suspend fun all(): List<Task>
 
