@@ -46,8 +46,10 @@ android {
         // and Compose runs smoothly at 90/120 Hz. Same key as before, so it installs over the old one.
         release {
             signingConfig = if (keystorePassword != null) signingConfigs.getByName("forty") else signingConfigs.getByName("debug")
-            // No code shrinking yet: everything stays exactly as tested.
-            isMinifyEnabled = false
+            // R8 removes unused code and resources and optimises the rest: a smaller APK that
+            // starts and runs faster. Names are kept (see proguard-rules.pro) so error reports stay readable.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
