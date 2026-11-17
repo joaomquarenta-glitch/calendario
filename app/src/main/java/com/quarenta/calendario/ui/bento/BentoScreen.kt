@@ -199,7 +199,7 @@ fun BentoScreen(
         items(filtered, key = { it.id }) { person -> PhotoTile(person, person.name, onLongClick = { toDelete = person }) { onOpenPerson(person) } }
         if (filtered.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Text("Nenhuma pessoa encontrada.", color = Bento.Secondary, modifier = Modifier.padding(8.dp))
+                com.quarenta.calendario.ui.components.EmptyState(com.quarenta.calendario.ui.components.EmptyArt.NoPeople, "Nenhuma pessoa encontrada", "Experimenta outro nome, ou junta alguém dos contactos.")
             }
         }
     }

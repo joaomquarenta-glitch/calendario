@@ -195,7 +195,7 @@ fun AgendaScreen(
                         )
                     }
                 }
-                is AgendaRow.Empty -> Text("Dia livre", modifier = Modifier.padding(start = 4.dp), color = Bento.Secondary, fontSize = 14.sp)
+                is AgendaRow.Empty -> com.quarenta.calendario.ui.components.EmptyState(com.quarenta.calendario.ui.components.EmptyArt.FreeDay, "Dia livre", "Nada marcado. Aproveita.", compact = true)
                 is AgendaRow.Event -> EventCard(row.event, row.date == today) { onOpenEvent(row.event) }
                 is AgendaRow.TaskRow -> TaskCard(row.task) { onToggleTask(row.task) }
             }
@@ -480,9 +480,7 @@ private fun HighlightsPage(
                 Modifier.padding(horizontal = 16.dp).fillMaxWidth().clip(RoundedCornerShape(30.dp)).background(Bento.Tile).padding(28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                IconTile(Icons.Rounded.CalendarMonth, Bento.Blue, 64.dp, 34.dp)
-                Text("Sem compromissos marcados", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Bento.Ink)
-                Text("Toca em + para marcar um.", fontSize = 15.sp, color = Bento.Secondary)
+                com.quarenta.calendario.ui.components.EmptyState(com.quarenta.calendario.ui.components.EmptyArt.NoEvents, "Sem compromissos marcados", "Toca em + para marcar um.")
             }
         } else {
             AgendaHighlights(upcoming, people, photoFor, onOpenEvent, Modifier.fillMaxWidth(), birthYearFor)
