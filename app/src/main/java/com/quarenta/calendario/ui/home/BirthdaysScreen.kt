@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.home
 
+import com.quarenta.calendario.ui.components.asHeading
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -66,7 +67,7 @@ fun BirthdaysScreen(
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
             }
         }
-        item { Text("Aniversários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall) }
+        item { Text("Aniversários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading()) }
         if (entries.isEmpty()) {
             item {
                 BentoTile(Modifier.fillMaxWidth()) {

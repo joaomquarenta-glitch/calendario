@@ -1,5 +1,11 @@
 package com.quarenta.calendario.ui.agenda
 
+import com.quarenta.calendario.ui.components.asHeading
+import com.quarenta.calendario.ui.Speech
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import com.quarenta.calendario.ui.components.taskToggle
 import com.quarenta.calendario.ui.components.LocalBars
 import android.content.Intent
 import androidx.compose.foundation.background
@@ -158,7 +164,7 @@ fun AgendaScreen(
     ) {
         item {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Agenda", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
+                Text("Agenda", style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading().weight(1f))
                 IconButton(onClick = onSearch) {
                     Icon(Icons.Rounded.Search, contentDescription = "Procurar compromissos", tint = Bento.Blue)
                 }
@@ -327,7 +333,13 @@ private fun DayCell(
     val isToday = date == today
     val circle = if (compact) 36.dp else 40.dp
     Column(
-        modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick).padding(vertical = if (compact) 2.dp else 4.dp),
+        modifier.clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick)
+            // TalkBack hears the whole date and how many events, not just "17".
+            .clearAndSetSemantics {
+                contentDescription = Speech.day(date, today, events.size)
+                this.selected = isSel
+            }
+            .padding(vertical = if (compact) 2.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -406,7 +418,7 @@ private fun TaskCard(task: Task, onToggle: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
             .background(Bento.Tile)
-            .clickable(onClick = onToggle)
+            .taskToggle(task.done, onToggle = onToggle)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -462,7 +474,7 @@ private fun HighlightsPage(
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(weekdayLong(today).uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Bento.RedText, letterSpacing = 0.8.sp)
-                Text("Agenda", style = MaterialTheme.typography.displaySmall)
+                Text("Agenda", style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
             }
             IconButton(
                 onClick = onSearch,

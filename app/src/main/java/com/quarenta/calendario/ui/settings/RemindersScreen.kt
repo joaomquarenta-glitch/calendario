@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.settings
 
+import com.quarenta.calendario.ui.components.asHeading
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -97,7 +98,7 @@ fun RemindersScreen(onClose: () -> Unit, sample: () -> ReminderAlert) {
         IconButton(onClick = onClose, modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile)) {
             Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
         }
-        Text("Lembretes", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
+        Text("Lembretes", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
         Text(
             "Em ecrã inteiro, com a foto da pessoa, para todos os calendários do telemóvel. " +
                 "Usa os avisos que já tens em cada compromisso.",

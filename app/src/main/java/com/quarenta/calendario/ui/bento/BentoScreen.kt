@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.bento
 
+import com.quarenta.calendario.ui.components.asHeading
 import com.quarenta.calendario.ui.components.LocalBars
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -147,7 +148,7 @@ fun BentoScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Text("Pessoas", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+            Text("Pessoas", style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading().padding(start = 4.dp, top = 4.dp))
         }
         if (!hasContactsAccess) {
             item(span = { GridItemSpan(maxLineSpan) }) {
