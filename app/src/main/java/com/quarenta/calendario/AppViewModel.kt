@@ -203,9 +203,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
-        refresh()
-        refreshPeople()
-        checkForUpdate()
+        // Events, people and the update check are loaded by MainActivity.onResume, which always
+        // follows; loading them here too made every launch read the calendars and contacts twice.
         syncSubscriptions(force = false)
     }
 
