@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.settings
 
+import com.quarenta.calendario.ui.components.asHeading
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -85,7 +86,7 @@ fun BackupScreen(onClose: () -> Unit) {
         IconButton(onClick = onClose, modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile)) {
             Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
         }
-        Text("Cópia de segurança", style = MaterialTheme.typography.displaySmall)
+        Text("Cópia de segurança", style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
         Text(
             "Guarda num ficheiro as tarefas, as notas e campos das pessoas, os planos, as ideias de prenda, " +
                 "as fotografias HD e as definições. Os compromissos ficam nos teus calendários (Google, Outlook...).",

@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.settings
 
+import com.quarenta.calendario.ui.components.asHeading
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,7 +84,7 @@ fun CalendarsScreen(
         IconButton(onClick = onClose, modifier = Modifier.size(44.dp).clip(CircleShape).background(Bento.Tile)) {
             Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
         }
-        Text("Calendários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
+        Text("Calendários", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
         Text(
             "Escolhe o que aparece na FortyCalendar. Os calendários ficam iguais nas outras apps.",
             fontSize = 15.sp, color = Bento.Secondary,

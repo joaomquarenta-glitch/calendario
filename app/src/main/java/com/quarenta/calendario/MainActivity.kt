@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import com.quarenta.calendario.ui.components.sideSafe
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -261,15 +262,39 @@ private fun App(vm: AppViewModel) {
         vm.messageShown()
         snackbar.showSnackbar(text)
     }
+    // Just deleted something: "Desfazer" for a few seconds, then it is final.
+    val undo by vm.undo.collectAsStateWithLifecycle()
+    LaunchedEffect(undo) {
+        val item = undo ?: return@LaunchedEffect
+        snackbar.currentSnackbarData?.dismiss()
+        val answer = kotlinx.coroutines.withTimeoutOrNull(com.quarenta.calendario.data.UndoRules.WINDOW_MS) {
+            snackbar.showSnackbar(item.text, actionLabel = "Desfazer", duration = androidx.compose.material3.SnackbarDuration.Indefinite)
+        }
+        if (answer == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+            haptic(com.quarenta.calendario.ui.components.Touch.Confirm)
+            vm.undo()
+        } else {
+            vm.finishUndo()
+        }
+    }
 
     // Frosted glass bars: the tabs scroll underneath the status bar and the tab bar.
     val glass = remember { dev.chrisbanes.haze.HazeState() }
+    // Phone on its side, foldable or tablet: tabs on a rail at the left, content centred.
+    val wide = com.quarenta.calendario.ui.components.isWide()
     Box(Modifier.fillMaxSize().background(Bento.Ground)) {
+      Row(Modifier.fillMaxSize()) {
+        if (wide) com.quarenta.calendario.ui.components.TabRail(
+            items = Tab.entries.map { it.label to it.icon },
+            selected = tab.ordinal,
+            onSelect = { i -> val t = Tab.entries[i]; if (tab != t) haptic(com.quarenta.calendario.ui.components.Touch.Tick); tab = t },
+        )
         Scaffold(
+            modifier = Modifier.weight(1f),
             containerColor = Bento.Ground,
             snackbarHost = { SnackbarHost(snackbar) },
             bottomBar = {
-                NavigationBar(
+                if (!wide) NavigationBar(
                     containerColor = Color.Transparent,
                     tonalElevation = 0.dp,
                     modifier = Modifier.hazeChild(glass, com.quarenta.calendario.ui.components.glassStyle())
@@ -336,6 +361,7 @@ private fun App(vm: AppViewModel) {
                     },
                     label = "tabs",
                 ) { shown ->
+                com.quarenta.calendario.ui.components.CenteredContent(Modifier.sideSafe(startHandled = wide)) {
                 when (shown) {
                     Tab.Home -> HomeScreen(
                         events = events, tasks = tasks, hasCalendarAccess = hasAccess,
@@ -373,6 +399,8 @@ private fun App(vm: AppViewModel) {
                         weatherAsk = weatherAsk,
                         onAllowWeather = { askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION) },
                         onDeclineWeather = vm::declineWeather,
+                        onMoveEvent = { e, minutes -> haptic(com.quarenta.calendario.ui.components.Touch.Confirm); vm.moveEvent(e, minutes) },
+                        onNewAt = vm::newEventAt,
                     )
                     Tab.People -> BentoScreen(
                         people = people,
@@ -391,10 +419,12 @@ private fun App(vm: AppViewModel) {
                     )
                 }
                 }
+                }
               }
             }
             }
         }
+      }
 
         // The status bar is frosted glass too, so the tabs blur as they scroll under it.
         if (update == null) Box(
@@ -423,7 +453,7 @@ private fun App(vm: AppViewModel) {
                 .then(if (o is Overlay.PersonCard) Modifier else Modifier.background(Bento.Ground))
                 // Registers as hit so taps never fall through to the tab underneath.
                 .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } },
-        ) { when (o) {
+        ) { com.quarenta.calendario.ui.components.SheetFrame(edgeToEdge = o is Overlay.PersonCard) { when (o) {
             is Overlay.Detail -> {
                 val key = com.quarenta.calendario.ui.agenda.Highlights.planKey(
                     o.event.id, o.event.start.atZone(java.time.ZoneId.systemDefault()).toLocalDate(),
@@ -537,7 +567,7 @@ private fun App(vm: AppViewModel) {
                 onPick = { person -> vm.setPhoto(person, o.uri, openCard = true) },
                 onClose = vm::closeOverlay,
             )
-        } }
+        } } }
         }
     }
 }
