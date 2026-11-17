@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.theme
 
+import com.quarenta.calendario.ui.components.asHeading
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,7 +52,7 @@ fun AppearanceScreen(selectedId: String, onSelect: (String) -> Unit, onClose: ()
                 Icon(Icons.Rounded.ArrowBack, contentDescription = "Voltar", tint = Bento.Ink)
             }
         }
-        Text("Aparência", style = androidx.compose.material3.MaterialTheme.typography.displaySmall)
+        Text("Aparência", style = androidx.compose.material3.MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading())
         Text("Escolhe as cores da app. Muda logo, e fica guardado.", fontSize = 15.sp, color = Bento.Secondary)
 
         Label("PRINCIPAL")

@@ -1,5 +1,6 @@
 package com.quarenta.calendario.ui.tasks
 
+import com.quarenta.calendario.ui.components.taskToggle
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.activity.compose.BackHandler
@@ -211,7 +212,7 @@ private fun StepsCard(steps: List<Task>, onToggle: (Task) -> Unit, onAdd: (Strin
         }
         steps.forEach { s ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).clickable { onToggle(s) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).taskToggle(s.done) { onToggle(s) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     TaskCheck(s.done)
                     Spacer(Modifier.size(12.dp))
                     Text(

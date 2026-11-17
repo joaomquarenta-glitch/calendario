@@ -1,5 +1,7 @@
 package com.quarenta.calendario.ui.tasks
 
+import com.quarenta.calendario.ui.components.asHeading
+import com.quarenta.calendario.ui.components.taskToggle
 import com.quarenta.calendario.ui.components.LocalBars
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -79,7 +81,7 @@ fun TasksScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Text("Tarefas", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(start = 4.dp, top = 20.dp))
+            Text("Tarefas", style = MaterialTheme.typography.displaySmall, modifier = Modifier.asHeading().padding(start = 4.dp, top = 20.dp))
         }
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -120,7 +122,7 @@ fun TasksScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(Modifier.clip(CircleShape).clickable { onToggle(task) }.padding(12.dp)) { TaskCheck(task.done) }
+                    Box(Modifier.clip(CircleShape).taskToggle(task.done, task.title) { onToggle(task) }.padding(12.dp)) { TaskCheck(task.done) }
                     Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
                         Text(
                             task.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
