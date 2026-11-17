@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.EventAvailable
 import androidx.compose.material.icons.rounded.Cake
 import androidx.compose.material3.Icon
@@ -223,6 +224,23 @@ fun HomeScreen(
                         last?.let { "Última: ${it.dayOfMonth} ${monthShort(it)}" } ?: "Guarda tudo num ficheiro",
                         fontSize = 13.sp, color = Bento.Secondary,
                     )
+                }
+            }
+        }
+
+        // Something wrong? One tap writes a short technical report to send by email or WhatsApp.
+        BentoTile(
+            Modifier.fillMaxWidth(),
+            onClick = {
+                val crash = com.quarenta.calendario.data.CrashStore
+                crash.send(context, com.quarenta.calendario.data.CrashReport.manual(crash.header(context), crash.last(context)))
+            },
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                IconTile(androidx.compose.material.icons.Icons.Rounded.BugReport, Bento.Orange)
+                Column(Modifier.weight(1f)) {
+                    Text("Relatar um problema", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Bento.Ink)
+                    Text("Envia um relatório por email ou WhatsApp", fontSize = 13.sp, color = Bento.Secondary)
                 }
             }
         }

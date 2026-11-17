@@ -153,6 +153,24 @@ private fun App(vm: AppViewModel) {
         }
         if (tabRequest != null) vm.tabShown()
     }
+    // The app closed by itself last time: offer, once, to send what went wrong.
+    val appContext = androidx.compose.ui.platform.LocalContext.current
+    var crashAsk by remember { mutableStateOf(com.quarenta.calendario.data.CrashStore.hasUnseen(appContext)) }
+    if (crashAsk) {
+        val dismiss = { com.quarenta.calendario.data.CrashStore.markSeen(appContext); crashAsk = false }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = dismiss,
+            title = { Text("A app fechou de repente") },
+            text = { Text("Da última vez algo correu mal. Queres enviar um relatório técnico para eu corrigir? Não leva compromissos, nomes nem notas.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    com.quarenta.calendario.data.CrashStore.last(appContext)?.let { com.quarenta.calendario.data.CrashStore.send(appContext, it) }
+                    dismiss()
+                }) { Text("Enviar") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = dismiss) { Text("Agora não") } },
+        )
+    }
     // A small vibration on the touches that matter: done feels different from deleted.
     val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
     val toggleTask: (com.quarenta.calendario.data.Task) -> Unit = { t ->
