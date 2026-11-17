@@ -31,6 +31,8 @@ import com.quarenta.calendario.data.IncomingRequest
 import com.quarenta.calendario.data.Task
 import com.quarenta.calendario.data.AppUpdate
 import com.quarenta.calendario.data.Updater
+import com.quarenta.calendario.data.UndoRules
+import com.quarenta.calendario.data.Undoable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -221,7 +223,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _hasContactsAccess.value = checkContacts()
         if (!checkContacts()) return
         viewModelScope.launch {
-            _people.value = withContext(Dispatchers.IO) { runCatching { contacts.all() }.getOrDefault(emptyList()) }
+            val all = withContext(Dispatchers.IO) { runCatching { contacts.all() }.getOrDefault(emptyList()) }
+            _people.value = UndoRules.visiblePeople(all, gonePeople, { it.id })
             refreshBirthdays()
         }
     }
@@ -419,19 +422,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             _message.value = "Sem autorização para alterar os contactos"
             return
         }
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { contacts.delete(person) }
-            if (!ok) {
-                _message.value = "Não foi possível apagar ${person.name}"
-                return@launch
-            }
-            stack.removeAll { it is Overlay.PersonCard && it.person.id == person.id }
-            _overlay.value = stack.lastOrNull()
-            photoCache.remove(person.id)
-            _people.value = _people.value.filter { it.id != person.id }
-            _message.value = "${person.name} foi apagado dos contactos"
-            refreshPeople()
-        }
+        // Gone from the screen now; really deleted from the contacts when "Desfazer" passes.
+        stack.removeAll { it is Overlay.PersonCard && it.person.id == person.id }
+        _overlay.value = stack.lastOrNull()
+        val item = Undoable.Person(person.id, person.name)
+        pendingPeople[person.id] = person
+        gonePeople += item
+        _people.value = UndoRules.visiblePeople(_people.value, gonePeople, { it.id })
+        offerUndo(item)
     }
 
     fun noteFor(key: String): Flow<PersonNote?> = personDao.observeNote(key)
@@ -478,7 +476,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ev to cals
             }
             loadedRange = from..to.minusDays(1)
-            _events.value = loaded
+            _events.value = UndoRules.visibleEvents(loaded, goneEvents, { it.id }, { it.instanceBegin })
             _writable.value = writable
         }
     }
@@ -621,13 +619,85 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun delete(event: CalendarEvent, onlyThis: Boolean = false) {
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                runCatching { calendars.delete(event.id, if (onlyThis && event.repeats) event.instanceBegin else null) }.getOrDefault(false)
-            }
-            _message.value = if (ok) "Compromisso apagado" else "Este calendário não permite apagar"
-            if (ok) { if (stack.lastOrNull() is Overlay.Detail) pop(); refresh() }
+        if (!event.canEdit) {
+            _message.value = "Este calendário não permite apagar"
+            return
         }
+        // Gone from the screen now; really deleted from the calendar when "Desfazer" passes.
+        if (stack.lastOrNull() is Overlay.Detail) pop()
+        val item = Undoable.Event(event.id, if (onlyThis && event.repeats) event.instanceBegin else null, event.title)
+        goneEvents += item
+        _events.value = UndoRules.visibleEvents(_events.value, goneEvents, { it.id }, { it.instanceBegin })
+        offerUndo(item)
+    }
+
+    // ---- "Desfazer" -------------------------------------------------------------------
+
+    private val _undo = MutableStateFlow<Undoable?>(null)
+    /** What was just deleted and can still come back, while "Desfazer" is on screen. */
+    val undo: StateFlow<Undoable?> = _undo.asStateFlow()
+    private val goneEvents = mutableListOf<Undoable.Event>()
+    private val gonePeople = mutableListOf<Undoable.Person>()
+    private val pendingPeople = mutableMapOf<Long, Person>()
+    private var undoTimer: kotlinx.coroutines.Job? = null
+    private val main = Handler(Looper.getMainLooper())
+    private var cleared = false
+
+    private fun offerUndo(item: Undoable) {
+        finishUndo() // a new deletion makes the previous one final
+        _undo.value = item
+        // A safety net: the snackbar normally ends the moment itself.
+        undoTimer = viewModelScope.launch { delay(UndoRules.WINDOW_MS + 4_000); finishUndo() }
+    }
+
+    /** "Desfazer" was tapped: everything comes back as it was. */
+    fun undo() {
+        val item = _undo.value ?: return
+        _undo.value = null
+        undoTimer?.cancel()
+        when (item) {
+            is Undoable.Event -> { goneEvents.remove(item); refresh() }
+            is Undoable.Person -> { gonePeople.remove(item); pendingPeople.remove(item.id); refreshPeople() }
+            is Undoable.Tasks -> viewModelScope.launch { taskDao.restore(item.saved) }
+        }
+    }
+
+    /** The "Desfazer" moment passed: the deletion becomes final. */
+    fun finishUndo() {
+        val item = _undo.value ?: return
+        _undo.value = null
+        undoTimer?.cancel()
+        commit(item)
+    }
+
+    /** Deletes for real, on its own thread, so it finishes even if the app is closing. */
+    private fun commit(item: Undoable) {
+        val app = getApplication<Application>()
+        when (item) {
+            is Undoable.Tasks -> Unit // already deleted
+            is Undoable.Event -> Thread {
+                val ok = runCatching { calendars.delete(item.id, item.instance) }.getOrDefault(false)
+                main.post {
+                    goneEvents.remove(item)
+                    if (cleared) return@post
+                    if (!ok) _message.value = "Não foi possível apagar \"${item.title}\""
+                    refresh()
+                }
+            }.start()
+            is Undoable.Person -> {
+                val person = pendingPeople.remove(item.id) ?: return
+                Thread {
+                    val ok = runCatching { contacts.delete(person) }.getOrDefault(false)
+                    main.post {
+                        gonePeople.remove(item)
+                        if (cleared) return@post
+                        if (ok) photoCache.remove(person.id) else _message.value = "Não foi possível apagar ${person.name}"
+                        refreshPeople()
+                    }
+                }.start()
+            }
+        }
+        com.quarenta.calendario.widget.NextWidget.refresh(app)
     }
 
     fun messageShown() { _message.value = null }
@@ -696,7 +766,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun openTask(task: Task) = push(Overlay.TaskEditor(task.id))
 
     fun deleteTask(task: Task) {
+        val saved = UndoRules.taskWithSteps(task, allTasks.value)
         viewModelScope.launch { taskDao.delete(task.id) }
+        offerUndo(Undoable.Tasks(saved))
     }
 
     private fun checkContacts(): Boolean =
@@ -708,6 +780,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             PackageManager.PERMISSION_GRANTED
 
     override fun onCleared() {
+        // Leaving the app while "Desfazer" is showing: the deletion still happens.
+        finishUndo()
+        cleared = true
         if (observing) getApplication<Application>().contentResolver.unregisterContentObserver(observer)
     }
 }
