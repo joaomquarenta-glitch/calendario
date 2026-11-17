@@ -572,6 +572,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         push(Overlay.Editor(EventDraft(title = title, start = start, end = start.plusSeconds(3600))))
     }
 
+    suspend fun colorsFor(event: CalendarEvent): List<com.quarenta.calendario.data.EventColor> =
+        withContext(Dispatchers.IO) { runCatching { calendars.eventColors(event.calendarId) }.getOrDefault(emptyList()) }
+
+    /** A colour of its own for this appointment (every repetition); null goes back to the calendar's. */
+    fun setEventColor(event: CalendarEvent, color: com.quarenta.calendario.data.EventColor?) {
+        viewModelScope.launch {
+            val shown = withContext(Dispatchers.IO) {
+                val ok = runCatching { calendars.setColor(event.id, color) }.getOrDefault(false)
+                if (!ok) null
+                else color?.argb ?: runCatching { calendars.allCalendars().firstOrNull { it.id == event.calendarId }?.color }.getOrNull() ?: event.color
+            }
+            if (shown == null) {
+                _message.value = "Este calendário não deixa mudar a cor"
+                return@launch
+            }
+            for (i in stack.indices) {
+                val o = stack[i]
+                if (o is Overlay.Detail && o.event.id == event.id) stack[i] = Overlay.Detail(o.event.copy(color = shown))
+            }
+            _overlay.value = stack.lastOrNull()
+            refresh()
+        }
+    }
+
     /** Dragged on the hour-by-hour day: the appointment moves by [minutes], same length. */
     fun moveEvent(event: CalendarEvent, minutes: Int) {
         if (minutes == 0) return

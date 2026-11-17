@@ -77,6 +77,11 @@ import com.quarenta.calendario.ui.dayHeading
 import com.quarenta.calendario.ui.localDate
 import com.quarenta.calendario.ui.theme.Bento
 import com.quarenta.calendario.ui.timeRange
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * The event, shown inside our own app: never handed to another calendar.
@@ -97,6 +102,8 @@ fun EventDetailScreen(
     onSavePlan: (EventPlan) -> Unit = {},
     phoneFor: suspend (Person) -> String? = { null },
     weatherFor: suspend (CalendarEvent) -> com.quarenta.calendario.data.DayWeather? = { null },
+    colorsFor: suspend (CalendarEvent) -> List<com.quarenta.calendario.data.EventColor> = { emptyList() },
+    onColor: (com.quarenta.calendario.data.EventColor?) -> Unit = {},
 ) {
     BackHandler(onBack = onClose)
     val context = LocalContext.current
@@ -200,6 +207,7 @@ fun EventDetailScreen(
             )
             val place = (plan?.place?.takeIf { it.isNotBlank() } ?: event.location).orEmpty().trim()
             if (place.isNotEmpty()) MiniMap(place, color)
+            if (event.canEdit) ColorCard(event, colorsFor, onColor)
             event.description?.let { notes ->
                 BentoTile(Modifier.fillMaxWidth()) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -369,5 +377,43 @@ private fun WeatherCard(w: com.quarenta.calendario.data.DayWeather) {
                 }
             }
         }
+    }
+}
+
+
+/** A colour of its own for this appointment, from the colours its account accepts. */
+@Composable
+private fun ColorCard(
+    event: CalendarEvent,
+    colorsFor: suspend (CalendarEvent) -> List<com.quarenta.calendario.data.EventColor>,
+    onColor: (com.quarenta.calendario.data.EventColor?) -> Unit,
+) {
+    val choices by produceState(emptyList<com.quarenta.calendario.data.EventColor>(), event.id, event.calendarId) { value = colorsFor(event) }
+    if (choices.isEmpty()) return
+    val haptic = com.quarenta.calendario.ui.components.rememberHaptics()
+    BentoTile(Modifier.fillMaxWidth()) {
+        Text("COR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Bento.Secondary)
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            choices.forEach { c ->
+                val picked = com.quarenta.calendario.data.EventColors.same(c.argb, event.color)
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape)
+                        .background(androidx.compose.ui.graphics.Color(c.argb).copy(alpha = 1f))
+                        .then(if (picked) Modifier.border(3.dp, Bento.Ink, CircleShape) else Modifier)
+                        .clickable { haptic(com.quarenta.calendario.ui.components.Touch.Tick); onColor(c) }
+                        .semantics { contentDescription = if (picked) "Cor escolhida" else "Escolher esta cor" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (picked) Icon(Icons.Rounded.Check, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        TextButton(onClick = { onColor(null) }) { Text("Usar a cor do calendário", fontSize = 15.sp) }
     }
 }

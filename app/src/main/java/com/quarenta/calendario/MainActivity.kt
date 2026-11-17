@@ -473,6 +473,8 @@ private fun App(vm: AppViewModel) {
                     onSavePlan = vm::savePlan,
                     phoneFor = vm::phoneFor,
                     weatherFor = vm::weatherFor,
+                    colorsFor = vm::colorsFor,
+                    onColor = { c -> vm.setEventColor(o.event, c) },
                 )
             }
             is Overlay.Editor -> EventEditorScreen(

@@ -323,6 +323,39 @@ class CalendarRepository(private val context: Context) {
         }
     }
 
+    /** The colours this appointment's account accepts (Google's own list), or the app's palette. */
+    fun eventColors(calendarId: Long): List<EventColor> {
+        val account = resolver.query(
+            ContentUris.withAppendedId(CalendarContract.Calendars.CONTENT_URI, calendarId),
+            arrayOf(CalendarContract.Calendars.ACCOUNT_NAME, CalendarContract.Calendars.ACCOUNT_TYPE),
+            null, null, null,
+        )?.use { c -> if (c.moveToFirst()) (c.getString(0) ?: "") to (c.getString(1) ?: "") else null }
+        val own = mutableListOf<Pair<String, Int>>()
+        if (account != null) runCatching {
+            resolver.query(
+                CalendarContract.Colors.CONTENT_URI,
+                arrayOf(CalendarContract.Colors.COLOR_KEY, CalendarContract.Colors.COLOR),
+                "${CalendarContract.Colors.ACCOUNT_NAME} = ? AND ${CalendarContract.Colors.ACCOUNT_TYPE} = ? AND " +
+                    "${CalendarContract.Colors.COLOR_TYPE} = ${CalendarContract.Colors.TYPE_EVENT}",
+                arrayOf(account.first, account.second), null,
+            )?.use { c -> while (c.moveToNext()) own += (c.getString(0) ?: continue) to c.getInt(1) }
+        }
+        return EventColors.choices(own)
+    }
+
+    /** Gives the appointment (the whole series) its own colour; null goes back to the calendar's. */
+    fun setColor(eventId: Long, color: EventColor?): Boolean {
+        val values = ContentValues().apply {
+            when {
+                color == null -> { putNull(CalendarContract.Events.EVENT_COLOR_KEY); putNull(CalendarContract.Events.EVENT_COLOR) }
+                color.key != null -> put(CalendarContract.Events.EVENT_COLOR_KEY, color.key)
+                else -> { putNull(CalendarContract.Events.EVENT_COLOR_KEY); put(CalendarContract.Events.EVENT_COLOR, color.argb) }
+            }
+        }
+        val uri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+        return resolver.update(uri, values, null, null) > 0
+    }
+
     /**
      * Moves an appointment by [shiftMillis], keeping its length. For a repeating one only this
      * occurrence moves (Android keeps it as an exception); the rest of the series stays put.
